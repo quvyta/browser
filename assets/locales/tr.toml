@@ -1,0 +1,76 @@
+# Türkçe.
+
+[meta]
+name = "Türkçe"
+code = "tr"
+
+[browser]
+too-small = "Terminal çok küçük"
+loading = "Yükleniyor"
+
+[browser.tab]
+new = "Yeni sekme"
+add = "Yeni bir sekme aç"
+close = "Bu sekmeyi kapat"
+crashed = "Bu sekme çöktü"
+crashed-message = "Sayfa çalışmayı bıraktı. Yeniden yüklersen yeniden başlar."
+reload = "Yeniden yükle"
+
+[browser.toolbar]
+back = "Geri"
+forward = "İleri"
+reload = "Sayfayı yenile"
+stop = "Yüklemeyi durdur"
+
+[browser.address]
+label = "Adres"
+placeholder = "Ara ya da bir adres yaz"
+
+[browser.profile]
+temporary = "geçici profil"
+temporary-explained = "Profilini başka bir qbrowser kullanıyor, bu yüzden bu pencere kendine ayrı bir profil açtı. Çerezleri ve oturumları pencere kapanınca silinir."
+
+[browser.chromium]
+missing = "Chromium bulunamadı"
+missing-message = "qbrowser web sayfalarını Chromium ile çizer, o da bu bilgisayarda kurulu değil."
+install = "Burada kur"
+show-command = "Komutu göster"
+command = "Chromium'u şu komut kurar:"
+still-missing = "Chromium hâlâ bulunamadı. Başka bir yere kurulduysa QBROW_CHROMIUM değişkenine yolunu yaz."
+unknown-system = "qbrowser bu sistemin program kurma yolunu tanımıyor. Chromium'u ya da Chrome'u sistemin kendi yoluyla kur ya da QBROW_CHROMIUM değişkenine birinin yolunu yaz, sonra qbrowser'ı yeniden aç."
+failed = "Chromium başlayamadı"
+stopped = "Chromium durdu"
+reason = "Son sözü: {reason}"
+restart = "Yeniden başlat"
+
+[browser.page]
+cannot-show = "Bu terminal resim gösteremiyor"
+cannot-show-message = "qbrowser web sayfalarını resim olarak gösterir. 256 ya da daha çok renkli bir terminal onları gösterir; kitty grafik protokolünü ya da sixel'i konuşan bir terminal keskin gösterir."
+
+[browser.cli]
+help = """
+qbrow {version}: terminalde gerçek bir web tarayıcısı
+
+Kullanım: qbrow [ADRES]
+
+  ADRES              bir web adresi, bu bilgisayardaki bir dosya ya da DuckDuckGo'da
+                     aranacak sözcükler. Verilmezse qbrowser boş bir sekme açar.
+  --profile KLASÖR   çerezleri ve oturumları her zamanki yer yerine KLASÖR'de tutar
+  --version          sürümü yazar
+  --help             bu yardımı yazar
+
+qbrowser sayfaları Chromium ya da Chrome ile çizer; onu PATH'te ya da QBROW_CHROMIUM'da arar.
+qbrowser açılışta günde en fazla bir kez crates.io'ya yeni bir sürüm olup olmadığını sorar; ayarlardan kapatılabilir."""
+unknown = "qbrow: bilinmeyen seçenek {argument}; qbrow --help yazıp bakabilirsin"
+no-profile-folder = "qbrow: --profile arkasından bir klasör ister"
+
+[keys]
+new-tab = "yeni sekme"
+close-tab = "sekmeyi kapat"
+next-tab = "sonraki sekme"
+prev-tab = "önceki sekme"
+location = "adres"
+back = "geri"
+forward = "ileri"
+reload = "yenile"
+cancel = "vazgeç"

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Quvyta Browser
+GenericName=Web Browser
+Comment=Browse the web in the terminal
+Exec=qbrow %u
+Terminal=true
+Icon=web-browser
+Categories=Network;WebBrowser;ConsoleOnly;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;
+Keywords=web;browser;internet;

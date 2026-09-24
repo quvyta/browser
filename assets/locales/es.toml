@@ -1,0 +1,77 @@
+# Español
+
+[meta]
+name = "Español"
+code = "es"
+fallback = "en"
+
+[browser]
+too-small = "La terminal es demasiado pequeña"
+loading = "Cargando"
+
+[browser.tab]
+new = "Pestaña nueva"
+add = "Abrir una pestaña nueva"
+close = "Cerrar esta pestaña"
+crashed = "Esta pestaña ha fallado"
+crashed-message = "La página ha dejado de funcionar. Recargarla la vuelve a iniciar."
+reload = "Recargar"
+
+[browser.toolbar]
+back = "Atrás"
+forward = "Adelante"
+reload = "Recargar esta página"
+stop = "Detener la carga"
+
+[browser.address]
+label = "Dirección"
+placeholder = "Busca o escribe una dirección"
+
+[browser.profile]
+temporary = "perfil temporal"
+temporary-explained = "Otro qbrowser está usando tu perfil, así que esta ventana tiene uno propio. Sus cookies e inicios de sesión se borran al cerrarse."
+
+[browser.chromium]
+missing = "No se encontró Chromium"
+missing-message = "qbrowser dibuja las páginas web con Chromium, que no está instalado en este equipo."
+install = "Instalar aquí"
+show-command = "Mostrar el comando"
+command = "Este comando instala Chromium:"
+still-missing = "Todavía no se encuentra Chromium. Si lo instalaste en otro sitio, define QBROW_CHROMIUM con su ruta."
+unknown-system = "qbrowser no sabe cómo se instalan los programas en este sistema. Instala Chromium o Chrome como lo haga tu sistema, o define QBROW_CHROMIUM con la ruta de uno, y vuelve a iniciar qbrowser."
+failed = "Chromium no pudo iniciarse"
+stopped = "Chromium se detuvo"
+reason = "Lo último que dijo: {reason}"
+restart = "Reiniciar"
+
+[browser.page]
+cannot-show = "Esta terminal no puede mostrar imágenes"
+cannot-show-message = "qbrowser muestra las páginas web como imágenes. Las muestra en una terminal con 256 colores o más, y con nitidez en una que hable el protocolo gráfico kitty o sixel."
+
+[browser.cli]
+help = """
+qbrow {version}: un navegador de verdad en la terminal
+
+Uso: qbrow [DIRECCIÓN]
+
+  DIRECCIÓN          una dirección web, un archivo de este equipo o palabras que buscar con
+                     DuckDuckGo. Sin ella, qbrowser abre una pestaña vacía.
+  --profile CARPETA  guarda cookies e inicios de sesión en CARPETA en vez del lugar habitual
+  --version          muestra la versión
+  --help             muestra esta ayuda
+
+qbrowser dibuja las páginas con Chromium o Chrome, que busca en PATH o en QBROW_CHROMIUM.
+Una vez al día, al arrancar, qbrowser pregunta a crates.io si hay una versión más nueva; puedes desactivarlo en los ajustes."""
+unknown = "qbrow: opción desconocida {argument}; consulta qbrow --help"
+no-profile-folder = "qbrow: --profile necesita una carpeta después"
+
+[keys]
+new-tab = "nueva pestaña"
+close-tab = "cerrar pestaña"
+next-tab = "pestaña siguiente"
+prev-tab = "pestaña anterior"
+location = "dirección"
+back = "atrás"
+forward = "adelante"
+reload = "recargar"
+cancel = "cancelar"

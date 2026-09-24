@@ -1,0 +1,77 @@
+# 简体中文
+
+[meta]
+name = "简体中文"
+code = "zh-Hans"
+fallback = "en"
+
+[browser]
+too-small = "终端太小"
+loading = "加载中"
+
+[browser.tab]
+new = "新标签页"
+add = "打开新标签页"
+close = "关闭此标签页"
+crashed = "此标签页已崩溃"
+crashed-message = "页面已停止工作。重新加载会重新启动它。"
+reload = "重新加载"
+
+[browser.toolbar]
+back = "后退"
+forward = "前进"
+reload = "重新加载此页面"
+stop = "停止加载"
+
+[browser.address]
+label = "地址"
+placeholder = "搜索或输入地址"
+
+[browser.profile]
+temporary = "临时配置"
+temporary-explained = "另一个 qbrowser 正在使用你的配置文件，所以这个窗口使用了自己的一个。关闭时会删除它的 cookie 和登录状态。"
+
+[browser.chromium]
+missing = "未找到 Chromium"
+missing-message = "qbrowser 用 Chromium 渲染网页，但这台电脑上没有安装。"
+install = "在此安装"
+show-command = "显示命令"
+command = "此命令安装 Chromium："
+still-missing = "仍未找到 Chromium。如果它装在别处，请把 QBROW_CHROMIUM 设为它的路径。"
+unknown-system = "qbrowser 不知道这个系统如何安装程序。请按你系统的方式安装 Chromium 或 Chrome，或把 QBROW_CHROMIUM 设为其中一个的路径，然后重新启动 qbrowser。"
+failed = "Chromium 无法启动"
+stopped = "Chromium 已停止"
+reason = "它最后说：{reason}"
+restart = "重新启动"
+
+[browser.page]
+cannot-show = "此终端无法显示图片"
+cannot-show-message = "qbrowser 把网页显示为图片。支持 256 色或更多颜色的终端可以显示，支持 kitty 图形协议或 sixel 的终端显示更清晰。"
+
+[browser.cli]
+help = """
+qbrow {version}：终端里的真正网页浏览器
+
+用法: qbrow [ADDRESS]
+
+  ADDRESS            一个网址、本机上的文件，或用 DuckDuckGo 搜索的词语。
+                     不带参数时 qbrowser 打开一个空白标签页。
+  --profile FOLDER   把 cookie 和登录状态保存在 FOLDER，而不是默认位置
+  --version          打印版本号
+  --help             打印这份帮助
+
+qbrowser 用 Chromium 或 Chrome 渲染页面，从 PATH 或 QBROW_CHROMIUM 查找。
+每天启动时 qbrowser 会询问 crates.io 是否有新版本；可在设置中关闭。"""
+unknown = "qbrow：未知选项 {argument}；请查看 qbrow --help"
+no-profile-folder = "qbrow：--profile 后需要跟一个文件夹"
+
+[keys]
+new-tab = "新建标签页"
+close-tab = "关闭标签页"
+next-tab = "下一个标签页"
+prev-tab = "上一个标签页"
+location = "地址栏"
+back = "后退"
+forward = "前进"
+reload = "重新加载"
+cancel = "取消"

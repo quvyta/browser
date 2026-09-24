@@ -1,0 +1,15 @@
+# qbrowser's own keys. While the page has focus every other key goes to the page, Tab and
+# shift+Tab too; these, and the framework's ctrl+q, stay with qbrowser. Esc is `cancel` for the
+# address bar, but the page keeps it while it has focus: pages close their own dialogs with it.
+
+[app]
+new-tab = "ctrl+t"
+close-tab = "ctrl+w"
+# Many terminals never send ctrl+Tab, so the tabs change with ctrl+Page Up and Page Down.
+next-tab = "ctrl+pgdn"
+prev-tab = "ctrl+pgup"
+location = ["ctrl+l", "f6"]
+back = "alt+left"
+forward = "alt+right"
+reload = ["ctrl+r", "f5"]
+cancel = "esc"

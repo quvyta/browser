@@ -1,0 +1,77 @@
+# Русский
+
+[meta]
+name = "Русский"
+code = "ru"
+fallback = "en"
+
+[browser]
+too-small = "Окно терминала слишком маленькое"
+loading = "Загрузка"
+
+[browser.tab]
+new = "Новая вкладка"
+add = "Открыть новую вкладку"
+close = "Закрыть эту вкладку"
+crashed = "Эта вкладка аварийно завершила работу"
+crashed-message = "Страница перестала работать. Перезагрузка запустит её заново."
+reload = "Перезагрузить"
+
+[browser.toolbar]
+back = "Назад"
+forward = "Вперёд"
+reload = "Перезагрузить эту страницу"
+stop = "Остановить загрузку"
+
+[browser.address]
+label = "Адрес"
+placeholder = "Поиск или адрес"
+
+[browser.profile]
+temporary = "временный профиль"
+temporary-explained = "Ваш профиль использует другой qbrowser, поэтому у этого окна есть собственный профиль. Его cookie и входы удаляются при закрытии."
+
+[browser.chromium]
+missing = "Chromium не найден"
+missing-message = "qbrowser рисует веб-страницы с помощью Chromium, который не установлен на этом компьютере."
+install = "Установить здесь"
+show-command = "Показать команду"
+command = "Эта команда устанавливает Chromium:"
+still-missing = "Chromium всё ещё не найден. Если он установлен в другом месте, укажите путь к нему в QBROW_CHROMIUM."
+unknown-system = "qbrowser не знает, как в этой системе устанавливаются программы. Установите Chromium или Chrome обычным для этой системы способом либо укажите путь к одному из них в QBROW_CHROMIUM, затем запустите qbrowser снова."
+failed = "Не удалось запустить Chromium"
+stopped = "Chromium остановлен"
+reason = "Последнее сообщение: {reason}"
+restart = "Перезапустить"
+
+[browser.page]
+cannot-show = "Этот терминал не показывает изображения"
+cannot-show-message = "qbrowser показывает веб-страницы как изображения. Их покажет терминал с 256 цветами или больше, а терминал с протоколом kitty graphics или sixel покажет их чётко."
+
+[browser.cli]
+help = """
+qbrow {version}: настоящий веб-браузер в терминале
+
+Использование: qbrow [АДРЕС]
+
+  АДРЕС              веб-адрес, файл на этом компьютере или слова для поиска через
+                     DuckDuckGo. Без него qbrowser открывает пустую вкладку.
+  --profile ПАПКА    хранить cookie и входы в ПАПКЕ, а не в обычном месте
+  --version          показать версию
+  --help             показать эту справку
+
+qbrowser рисует страницы с помощью Chromium или Chrome, найденных в PATH или в QBROW_CHROMIUM.
+Раз в день при запуске qbrowser спрашивает crates.io, не вышла ли новая версия; отключите это в настройках."""
+unknown = "qbrow: неизвестный параметр {argument}; см. qbrow --help"
+no-profile-folder = "qbrow: после --profile требуется указать папку"
+
+[keys]
+new-tab = "новая вкладка"
+close-tab = "закрыть вкладку"
+next-tab = "следующая вкладка"
+prev-tab = "предыдущая вкладка"
+location = "адрес"
+back = "назад"
+forward = "вперёд"
+reload = "обновить"
+cancel = "отмена"

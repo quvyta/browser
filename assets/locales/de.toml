@@ -1,0 +1,77 @@
+# Deutsch
+
+[meta]
+name = "Deutsch"
+code = "de"
+fallback = "en"
+
+[browser]
+too-small = "Das Terminal ist zu klein"
+loading = "Wird geladen"
+
+[browser.tab]
+new = "Neuer Tab"
+add = "Neuen Tab öffnen"
+close = "Diesen Tab schließen"
+crashed = "Dieser Tab ist abgestürzt"
+crashed-message = "Die Seite hat aufgehört zu funktionieren. Ein Neuladen startet sie neu."
+reload = "Neu laden"
+
+[browser.toolbar]
+back = "Zurück"
+forward = "Vorwärts"
+reload = "Diese Seite neu laden"
+stop = "Laden abbrechen"
+
+[browser.address]
+label = "Adresse"
+placeholder = "Suchen oder Adresse eingeben"
+
+[browser.profile]
+temporary = "temporäres Profil"
+temporary-explained = "Ein anderes qbrowser verwendet dein Profil, daher hat dieses Fenster ein eigenes. Seine Cookies und Anmeldungen werden beim Schließen gelöscht."
+
+[browser.chromium]
+missing = "Chromium wurde nicht gefunden"
+missing-message = "qbrowser stellt Webseiten mit Chromium dar, das auf diesem Computer nicht installiert ist."
+install = "Hier installieren"
+show-command = "Befehl anzeigen"
+command = "Dieser Befehl installiert Chromium:"
+still-missing = "Chromium wurde weiterhin nicht gefunden. Falls es woanders installiert wurde, setze QBROW_CHROMIUM auf seinen Pfad."
+unknown-system = "qbrowser weiß nicht, wie dieses System Programme installiert. Installiere Chromium oder Chrome so, wie es dein System vorsieht, oder setze QBROW_CHROMIUM auf den Pfad zu einem davon und starte qbrowser dann neu."
+failed = "Chromium konnte nicht gestartet werden"
+stopped = "Chromium wurde beendet"
+reason = "Zuletzt meldete es: {reason}"
+restart = "Neu starten"
+
+[browser.page]
+cannot-show = "Dieses Terminal kann keine Bilder anzeigen"
+cannot-show-message = "qbrowser zeigt Webseiten als Bilder an. Ein Terminal mit 256 Farben oder mehr zeigt sie, und eines, das das kitty-Grafikprotokoll oder Sixel beherrscht, zeigt sie gestochen scharf."
+
+[browser.cli]
+help = """
+qbrow {version}: ein echter Webbrowser im Terminal
+
+Aufruf: qbrow [ADRESSE]
+
+  ADRESSE            eine Webadresse, eine Datei auf diesem Computer oder Suchbegriffe für
+                     DuckDuckGo. Ohne Angabe öffnet qbrowser einen leeren Tab.
+  --profile ORDNER   Cookies und Anmeldungen in ORDNER statt am üblichen Ort speichern
+  --version          die Version ausgeben
+  --help             diese Hilfe ausgeben
+
+qbrowser stellt Seiten mit Chromium oder Chrome dar, gefunden in PATH oder unter QBROW_CHROMIUM.
+Einmal täglich fragt qbrowser beim Start crates.io nach einer neueren Version; abschaltbar in den Einstellungen."""
+unknown = "qbrow: unbekannte Option {argument}; siehe qbrow --help"
+no-profile-folder = "qbrow: hinter --profile muss ein Ordner stehen"
+
+[keys]
+new-tab = "neuer Tab"
+close-tab = "Tab schließen"
+next-tab = "nächster Tab"
+prev-tab = "vorheriger Tab"
+location = "Adresse"
+back = "zurück"
+forward = "vorwärts"
+reload = "neu laden"
+cancel = "abbrechen"

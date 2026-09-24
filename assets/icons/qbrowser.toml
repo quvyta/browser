@@ -1,0 +1,9 @@
+# qbrowser's own icons, for what the framework's set has no glyph for. Every icon has all three
+# glyphs, so each shows whatever the terminal can draw.
+
+[meta]
+name = "qbrowser"
+
+[icons]
+# nf-md-refresh
+"browser.reload" = { nerd = "\U000F0450", unicode = "⟳", ascii = "R" }

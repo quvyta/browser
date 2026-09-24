@@ -1,0 +1,77 @@
+# Français
+
+[meta]
+name = "Français"
+code = "fr"
+fallback = "en"
+
+[browser]
+too-small = "Le terminal est trop petit"
+loading = "Chargement"
+
+[browser.tab]
+new = "Nouvel onglet"
+add = "Ouvrir un nouvel onglet"
+close = "Fermer cet onglet"
+crashed = "Cet onglet a planté"
+crashed-message = "La page ne répond plus. La recharger la relancera."
+reload = "Recharger"
+
+[browser.toolbar]
+back = "Retour"
+forward = "Suivant"
+reload = "Recharger cette page"
+stop = "Arrêter le chargement"
+
+[browser.address]
+label = "Adresse"
+placeholder = "Rechercher ou saisir une adresse"
+
+[browser.profile]
+temporary = "profil temporaire"
+temporary-explained = "Un autre qbrowser utilise votre profil, cette fenêtre a donc le sien. Ses cookies et connexions sont supprimés à sa fermeture."
+
+[browser.chromium]
+missing = "Chromium est introuvable"
+missing-message = "qbrowser affiche les pages web grâce à Chromium, qui n’est pas installé sur cet ordinateur."
+install = "Installer ici"
+show-command = "Afficher la commande"
+command = "Cette commande installe Chromium :"
+still-missing = "Chromium est toujours introuvable. S’il est installé ailleurs, définissez QBROW_CHROMIUM sur son chemin."
+unknown-system = "qbrowser ne sait pas comment ce système installe les programmes. Installez Chromium ou Chrome selon la méthode de votre système, ou définissez QBROW_CHROMIUM sur le chemin de l’un d’eux, puis relancez qbrowser."
+failed = "Chromium n’a pas pu démarrer"
+stopped = "Chromium s’est arrêté"
+reason = "Dernier message : {reason}"
+restart = "Redémarrer"
+
+[browser.page]
+cannot-show = "Ce terminal ne peut pas afficher d’images"
+cannot-show-message = "qbrowser affiche les pages web sous forme d’images. Un terminal avec 256 couleurs ou plus les affiche, et un terminal qui comprend le protocole kitty ou sixel les affiche nettes."
+
+[browser.cli]
+help = """
+qbrow {version} : un vrai navigateur web dans le terminal
+
+Utilisation : qbrow [ADRESSE]
+
+  ADRESSE            une adresse web, un fichier sur cet ordinateur, ou des mots à rechercher
+                     avec DuckDuckGo. Sans argument, qbrowser ouvre un onglet vide.
+  --profile DOSSIER  conserve les cookies et connexions dans DOSSIER plutôt qu’à l’emplacement habituel
+  --version          affiche la version
+  --help             affiche cette aide
+
+qbrowser affiche les pages avec Chromium ou Chrome, trouvés dans le PATH ou à QBROW_CHROMIUM.
+Une fois par jour au démarrage, qbrowser demande à crates.io si une nouvelle version est sortie ; désactivez-le dans les paramètres."""
+unknown = "qbrow : option inconnue {argument} ; consultez qbrow --help"
+no-profile-folder = "qbrow : --profile nécessite un dossier après lui"
+
+[keys]
+new-tab = "nouvel onglet"
+close-tab = "fermer l'onglet"
+next-tab = "onglet suivant"
+prev-tab = "onglet précédent"
+location = "adresse"
+back = "retour"
+forward = "avancer"
+reload = "recharger"
+cancel = "annuler"

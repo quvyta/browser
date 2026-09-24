@@ -1,0 +1,77 @@
+# Português (Brasil)
+
+[meta]
+name = "Português (Brasil)"
+code = "pt-BR"
+fallback = "en"
+
+[browser]
+too-small = "O terminal é muito pequeno"
+loading = "Carregando"
+
+[browser.tab]
+new = "Nova aba"
+add = "Abrir uma nova aba"
+close = "Fechar esta aba"
+crashed = "Esta aba travou"
+crashed-message = "A página parou de funcionar. Recarregar a inicia novamente."
+reload = "Recarregar"
+
+[browser.toolbar]
+back = "Voltar"
+forward = "Avançar"
+reload = "Recarregar esta página"
+stop = "Parar o carregamento"
+
+[browser.address]
+label = "Endereço"
+placeholder = "Pesquise ou digite um endereço"
+
+[browser.profile]
+temporary = "perfil temporário"
+temporary-explained = "Outro qbrowser está usando seu perfil, então esta janela tem um perfil próprio. Os cookies e acessos dele são apagados quando ele fecha."
+
+[browser.chromium]
+missing = "Chromium não foi encontrado"
+missing-message = "O qbrowser desenha as páginas da web com o Chromium, que não está instalado neste computador."
+install = "Instalar aqui"
+show-command = "Mostrar o comando"
+command = "Este comando instala o Chromium:"
+still-missing = "O Chromium ainda não foi encontrado. Se ele foi instalado em outro lugar, defina QBROW_CHROMIUM como o caminho dele."
+unknown-system = "O qbrowser não sabe como este sistema instala programas. Instale o Chromium ou o Chrome do jeito que o seu sistema faz, ou defina QBROW_CHROMIUM como o caminho de um deles e inicie o qbrowser novamente."
+failed = "Não foi possível iniciar o Chromium"
+stopped = "O Chromium parou"
+reason = "Ele disse por último: {reason}"
+restart = "Reiniciar"
+
+[browser.page]
+cannot-show = "Este terminal não pode mostrar imagens"
+cannot-show-message = "O qbrowser mostra as páginas da web como imagens. Um terminal com 256 cores ou mais as mostra, e um que fale o protocolo de gráficos kitty ou sixel as mostra nítidas."
+
+[browser.cli]
+help = """
+qbrow {version}: um navegador de verdade no terminal
+
+Uso: qbrow [ENDEREÇO]
+
+  ENDEREÇO          um endereço da web, um arquivo neste computador ou palavras para pesquisar no
+                    DuckDuckGo. Sem um, o qbrowser abre uma aba vazia.
+  --profile PASTA   guarda cookies e acessos na PASTA em vez do lugar habitual
+  --version         mostra a versão
+  --help            mostra esta ajuda
+
+O qbrowser desenha as páginas com o Chromium ou o Chrome, encontrados no PATH ou em QBROW_CHROMIUM.
+Uma vez por dia, ao iniciar, o qbrowser pergunta ao crates.io se saiu uma versão mais nova; desative isso nas configurações."""
+unknown = "qbrow: opção desconhecida {argument}; veja qbrow --help"
+no-profile-folder = "qbrow: --profile precisa de uma pasta depois dele"
+
+[keys]
+new-tab = "nova aba"
+close-tab = "fechar aba"
+next-tab = "próxima aba"
+prev-tab = "aba anterior"
+location = "endereço"
+back = "voltar"
+forward = "avançar"
+reload = "recarregar"
+cancel = "cancelar"

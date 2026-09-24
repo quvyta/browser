@@ -1,0 +1,76 @@
+# English: the final fallback language. Every other language file is checked against this one.
+
+[meta]
+name = "English"
+code = "en"
+
+[browser]
+too-small = "The terminal is too small"
+loading = "Loading"
+
+[browser.tab]
+new = "New tab"
+add = "Open a new tab"
+close = "Close this tab"
+crashed = "This tab crashed"
+crashed-message = "The page stopped working. Reloading starts it again."
+reload = "Reload"
+
+[browser.toolbar]
+back = "Back"
+forward = "Forward"
+reload = "Reload this page"
+stop = "Stop loading"
+
+[browser.address]
+label = "Address"
+placeholder = "Search or type an address"
+
+[browser.profile]
+temporary = "temporary profile"
+temporary-explained = "Another qbrowser is using your profile, so this window has one of its own. Its cookies and sign-ins are deleted when it closes."
+
+[browser.chromium]
+missing = "Chromium was not found"
+missing-message = "qbrowser draws web pages with Chromium, which is not installed on this computer."
+install = "Install here"
+show-command = "Show the command"
+command = "This command installs Chromium:"
+still-missing = "Chromium is still not found. If it was installed somewhere else, set QBROW_CHROMIUM to its path."
+unknown-system = "qbrowser does not know how this system installs programs. Install Chromium or Chrome the way your system does, or set QBROW_CHROMIUM to the path of one, then start qbrowser again."
+failed = "Chromium could not start"
+stopped = "Chromium stopped"
+reason = "It said last: {reason}"
+restart = "Restart"
+
+[browser.page]
+cannot-show = "This terminal cannot show pictures"
+cannot-show-message = "qbrowser shows web pages as pictures. A terminal with 256 colours or more shows them, and one that speaks the kitty graphics protocol or sixel shows them sharp."
+
+[browser.cli]
+help = """
+qbrow {version}: a real web browser in the terminal
+
+Usage: qbrow [ADDRESS]
+
+  ADDRESS            a web address, a file on this computer, or words to search for with
+                     DuckDuckGo. Without one qbrowser opens an empty tab.
+  --profile FOLDER   keep cookies and sign-ins in FOLDER instead of the usual place
+  --version          print the version
+  --help             print this help
+
+qbrowser draws pages with Chromium or Chrome, found on PATH or at QBROW_CHROMIUM.
+Once a day at start qbrowser asks crates.io whether a newer version is out; turn it off in the settings."""
+unknown = "qbrow: unknown option {argument}; see qbrow --help"
+no-profile-folder = "qbrow: --profile needs a folder after it"
+
+[keys]
+new-tab = "new tab"
+close-tab = "close tab"
+next-tab = "next tab"
+prev-tab = "previous tab"
+location = "address"
+back = "back"
+forward = "forward"
+reload = "reload"
+cancel = "cancel"
