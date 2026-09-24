@@ -44,6 +44,16 @@ stopped = "Chromium se detuvo"
 reason = "Lo último que dijo: {reason}"
 restart = "Reiniciar"
 
+[browser.bookmarks]
+add = "Marcar esta página"
+remove = "Quitar este marcador"
+added = "Guardado en marcadores"
+removed = "Marcador eliminado"
+not-saved = "No se pudieron guardar los marcadores"
+more = "Más"
+open-new-tab = "Abrir en una pestaña nueva"
+delete = "Quitar"
+
 [browser.page]
 cannot-show = "Esta terminal no puede mostrar imágenes"
 cannot-show-message = "qbrowser muestra las páginas web como imágenes. Las muestra en una terminal con 256 colores o más, y con nitidez en una que hable el protocolo gráfico kitty o sixel."
@@ -75,3 +85,4 @@ back = "atrás"
 forward = "adelante"
 reload = "recargar"
 cancel = "cancelar"
+bookmark = "marcador"

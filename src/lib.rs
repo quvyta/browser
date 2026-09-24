@@ -4,6 +4,7 @@
 
 pub mod address;
 pub mod app;
+pub mod bookmarks;
 pub mod cli;
 pub mod engine;
 pub mod keys;

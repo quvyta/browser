@@ -6,13 +6,18 @@ use qframe::event::{Event, MouseButton, MouseKind};
 use qframe::prelude::*;
 use qframe::style::CellStyle;
 use qframe::widget::{EventCx, MeasureCx, PaintCx, Widget};
-use qframe::widgets::{Badge, EmptyState, IconButton, Spinner, TabWidth, Tabs, TextInput, Tooltip};
+use qframe::widgets::{Badge, EmptyState, IconButton, Spinner, TabWidth, Tabs, Tooltip};
 
 use super::{Browser, Missing, Msg, Phase};
 use crate::page_view::PageView;
 
-/// The rows above the page: the tab strip and the toolbar.
+/// The rows above the page: the tab strip and the toolbar. The bar of bookmarks adds one while
+/// there are any.
 pub(super) const CHROME_ROWS: u16 = 2;
+
+/// The toolbar's cells beside the address field: its two edge cells, back, forward, reload and the
+/// star three each, the loading mark one, and the five gaps between them.
+pub(super) const TOOLBAR_CELLS: u16 = 2 + 4 * 3 + 1 + 5;
 
 /// The name of the page area, which has the keyboard whenever nobody types an address.
 pub(super) const PAGE: &str = "page";
@@ -41,6 +46,7 @@ impl Browser {
                         ui.column(|ui| {
                             self.strip(ui);
                             self.toolbar(ui);
+                            self.bookmarks_bar(ui);
                         })
                         .fill_width();
                     })
@@ -53,10 +59,11 @@ impl Browser {
     /// The tabs, each named by its page, with a close mark on each and `+` after them.
     fn strip(&self, ui: &mut View<'_, Msg>) {
         let labels = self.tabs.iter().map(|tab| tab.label().map_or_else(|| t!("browser.tab.new"), str::to_owned));
+        let width = tab_width(ui.size().width, self.tabs.len());
         ui.add(
             Tabs::new(labels)
                 .active(self.active)
-                .tab_width(TabWidth::Fill)
+                .tab_width(TabWidth::Fixed(width))
                 .on_select(Msg::SelectTab)
                 .closable(Msg::CloseTab)
                 .on_add(|| Msg::NewTab),
@@ -66,7 +73,8 @@ impl Browser {
         .id("tabs");
     }
 
-    /// Back, forward, reload or stop, the address, the loading mark and the temporary profile.
+    /// Back, forward, reload or stop, the address, the star, the loading mark and the temporary
+    /// profile.
     fn toolbar(&self, ui: &mut View<'_, Msg>) {
         let tab = self.tab();
         ui.row(|ui| {
@@ -96,17 +104,7 @@ impl Browser {
                 .id("reload");
             }
             match &self.location {
-                Some(text) => {
-                    ui.add(
-                        TextInput::new(text.clone())
-                            .placeholder(t!("browser.address.placeholder"))
-                            .select_all_on_focus()
-                            .on_change(Msg::LocationTyped)
-                            .on_submit(Msg::Go),
-                    )
-                    .fill_width()
-                    .id(LOCATION);
-                }
+                Some(text) => self.address_field(ui, text),
                 None => {
                     let address = AddressText {
                         address: tab.address().to_owned(),
@@ -116,6 +114,7 @@ impl Browser {
                     ui.add(address).fill_width().id("address");
                 }
             }
+            self.star(ui);
             let busy = self.phase == Phase::Starting || tab.busy();
             ui.add(Loading { busy }).id("loading");
             if self.temporary {
@@ -204,6 +203,33 @@ impl Browser {
         }
         ui.add(state).fill();
     }
+}
+
+/// The widest a tab grows, in cells: about as wide as a desktop browser's tab, so one tab does
+/// not stretch across the whole strip with its close mark at the far edge.
+const TAB_WIDEST: u16 = 28;
+
+/// The narrowest a tab shrinks to before the strip scrolls sideways; the framework's own floor for
+/// shared tabs.
+const TAB_NARROWEST: u16 = 12;
+
+/// The cells the strip keeps after the tabs for `+`: the framework's add button, three cells, and
+/// the gap before it.
+const ADD_ROOM: u16 = 4;
+
+/// The cells the framework keeps between two tabs.
+const TAB_GAP: u16 = 1;
+
+/// How wide each of `count` tabs is on a strip `strip` cells wide: they share the strip as the
+/// framework's `TabWidth::Fill` does, but never grow past [`TAB_WIDEST`], and below
+/// [`TAB_NARROWEST`] the strip scrolls instead.
+///
+/// The framework's `Fill` has no widest size, so qbrowser works the width out itself and hands
+/// the framework a fixed one each frame.
+fn tab_width(strip: u16, count: usize) -> u16 {
+    let count = u16::try_from(count).unwrap_or(u16::MAX).max(1);
+    let room = strip.saturating_sub(ADD_ROOM).saturating_sub((count - 1).saturating_mul(TAB_GAP));
+    (room / count).clamp(TAB_NARROWEST, TAB_WIDEST)
 }
 
 /// The address as plain text in the toolbar: a click on it turns it into the field.
@@ -323,6 +349,14 @@ mod tests {
 
     fn ms(value: u64) -> Duration {
         Duration::from_millis(value)
+    }
+
+    #[test]
+    fn tabs_share_the_strip_up_to_a_desktop_tab_and_no_narrower_than_twelve() {
+        assert_eq!(tab_width(100, 1), TAB_WIDEST, "one tab does not stretch across the strip");
+        assert_eq!(tab_width(100, 5), 18, "five tabs share the 92 cells beside `+`");
+        assert_eq!(tab_width(100, 20), TAB_NARROWEST, "twenty scroll sideways");
+        assert_eq!(tab_width(0, 0), TAB_NARROWEST);
     }
 
     #[test]

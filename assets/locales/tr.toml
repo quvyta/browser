@@ -43,6 +43,16 @@ stopped = "Chromium durdu"
 reason = "Son sözü: {reason}"
 restart = "Yeniden başlat"
 
+[browser.bookmarks]
+add = "Bu sayfayı yer imlerine ekle"
+remove = "Bu yer imini kaldır"
+added = "Yer imlerine eklendi"
+removed = "Yer imi kaldırıldı"
+not-saved = "Yer imleri kaydedilemedi"
+more = "Diğerleri"
+open-new-tab = "Yeni sekmede aç"
+delete = "Kaldır"
+
 [browser.page]
 cannot-show = "Bu terminal resim gösteremiyor"
 cannot-show-message = "qbrowser web sayfalarını resim olarak gösterir. 256 ya da daha çok renkli bir terminal onları gösterir; kitty grafik protokolünü ya da sixel'i konuşan bir terminal keskin gösterir."
@@ -74,3 +84,4 @@ back = "geri"
 forward = "ileri"
 reload = "yenile"
 cancel = "vazgeç"
+bookmark = "yer imi"

@@ -44,6 +44,16 @@ stopped = "Chromium wurde beendet"
 reason = "Zuletzt meldete es: {reason}"
 restart = "Neu starten"
 
+[browser.bookmarks]
+add = "Diese Seite als Lesezeichen speichern"
+remove = "Dieses Lesezeichen entfernen"
+added = "Lesezeichen hinzugefügt"
+removed = "Lesezeichen entfernt"
+not-saved = "Die Lesezeichen konnten nicht gespeichert werden"
+more = "Mehr"
+open-new-tab = "In neuem Tab öffnen"
+delete = "Entfernen"
+
 [browser.page]
 cannot-show = "Dieses Terminal kann keine Bilder anzeigen"
 cannot-show-message = "qbrowser zeigt Webseiten als Bilder an. Ein Terminal mit 256 Farben oder mehr zeigt sie, und eines, das das kitty-Grafikprotokoll oder Sixel beherrscht, zeigt sie gestochen scharf."
@@ -75,3 +85,4 @@ back = "zurück"
 forward = "vorwärts"
 reload = "neu laden"
 cancel = "abbrechen"
+bookmark = "Lesezeichen"

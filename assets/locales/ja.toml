@@ -44,6 +44,16 @@ stopped = "Chromium が停止しました"
 reason = "最後のメッセージ: {reason}"
 restart = "再起動"
 
+[browser.bookmarks]
+add = "このページをブックマーク"
+remove = "このブックマークを削除"
+added = "ブックマークしました"
+removed = "ブックマークを削除しました"
+not-saved = "ブックマークを保存できませんでした"
+more = "その他"
+open-new-tab = "新しいタブで開く"
+delete = "削除"
+
 [browser.page]
 cannot-show = "この端末では画像を表示できません"
 cannot-show-message = "qbrowser はウェブページを画像として表示します。256色以上に対応した端末で表示でき、kitty グラフィックスプロトコルや sixel に対応した端末では鮮明に表示されます。"
@@ -75,3 +85,4 @@ back = "戻る"
 forward = "進む"
 reload = "再読み込み"
 cancel = "キャンセル"
+bookmark = "ブックマーク"

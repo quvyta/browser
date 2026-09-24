@@ -44,6 +44,16 @@ stopped = "O Chromium parou"
 reason = "Ele disse por último: {reason}"
 restart = "Reiniciar"
 
+[browser.bookmarks]
+add = "Adicionar esta página aos favoritos"
+remove = "Remover este favorito"
+added = "Favorito adicionado"
+removed = "Favorito removido"
+not-saved = "Não foi possível salvar os favoritos"
+more = "Mais"
+open-new-tab = "Abrir em nova aba"
+delete = "Remover"
+
 [browser.page]
 cannot-show = "Este terminal não pode mostrar imagens"
 cannot-show-message = "O qbrowser mostra as páginas da web como imagens. Um terminal com 256 cores ou mais as mostra, e um que fale o protocolo de gráficos kitty ou sixel as mostra nítidas."
@@ -75,3 +85,4 @@ back = "voltar"
 forward = "avançar"
 reload = "recarregar"
 cancel = "cancelar"
+bookmark = "favorito"

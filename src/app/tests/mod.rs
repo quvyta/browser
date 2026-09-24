@@ -22,6 +22,7 @@ use super::{Browser, Machine, Opening, UpdateFolders};
 use crate::cli::Start;
 use crate::engine::tests::fixture::{self, CHROMIUM, PATIENCE};
 
+mod bookmarks;
 mod browsing;
 mod states;
 mod tabs;
@@ -71,6 +72,7 @@ impl Scratch {
             config: Some(self.path("config")),
             updates: Some(UpdateFolders { config: self.path("config"), state: self.path("state") }),
             cell: Some(CELL),
+            bookmarks: Some(self.path("data/quvyta/browser/bookmarks")),
         }
     }
 

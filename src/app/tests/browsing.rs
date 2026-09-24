@@ -1,11 +1,18 @@
 //! A page from where the person clicks, types and scrolls: the page drawn and named, links, the
 //! address bar, back and forward, the wheel, fields, and Esc on a page that is loading.
 
+use std::time::{Duration, Instant};
+
+use qframe::color::Rgb;
 use qframe::event::MouseKind;
+use qframe::graphics::Graphics;
+use qframe::prelude::Harness;
 use serde_json::json;
 
+use super::super::{Browser, Machine};
 use super::{
-    PAGE_TOP, Scratch, Slot, cell_of, click_icon, eval, find_in_row, open, open_on, page, page_drawn, until, until_page,
+    PAGE_TOP, PATIENCE, Scratch, Slot, cell_of, click_icon, eval, find_in_row, open, open_on, page, page_drawn, until,
+    until_page,
 };
 
 #[test]
@@ -107,4 +114,100 @@ fn esc_on_a_loading_page_stops_it() {
         find_in_row(h, &h.env().icons().glyph("browser.reload"), 1).is_some()
             && eval(h, "document.readyState !== 'loading'") == json!(true)
     });
+}
+
+/// A large full-pixel terminal window: 200 × 50 cells of 18 × 36 pixels, so every picture of the
+/// page is 3600 × 1728 pixels, as on a high-density screen.
+const LARGE: (u16, u16, (u32, u32)) = (200, 50, (18, 36));
+
+/// How soon a turn of the wheel shows on screen at the least. Optimised, a picture of a
+/// [`LARGE`] window takes a few milliseconds to decode and the whole way from the wheel to the
+/// screen well under a quarter of a second; unoptimised it took over a second, and the page
+/// seemed not to scroll at all.
+const PROMPT: Duration = Duration::from_millis(500);
+
+/// How many turns [`fastest_redraw`] times: a busy machine may slow one, not all of them.
+const TURNS: usize = 3;
+
+/// The screen on the `/long` page in a [`LARGE`] window drawn with `graphics`, once its first
+/// picture has settled.
+fn large_long_page(scratch: &Scratch, graphics: Graphics) -> Harness<Browser> {
+    let (width, height, cell) = LARGE;
+    let machine = Machine { cell: Some(cell), ..scratch.machine() };
+    let long = page("/long");
+    let mut h = open_on(machine, Some(&long));
+    h.resize(width, height).set_graphics(graphics);
+    let viewport = u32::from(width) * cell.0;
+    until(&mut h, "the page laid out for the large window", |h| {
+        h.app().address() == long && h.app().tab().picture.as_ref().is_some_and(|picture| picture.width() == viewport)
+    });
+    h
+}
+
+/// Turns the wheel down over the page [`TURNS`] times and returns the shortest time from a turn
+/// to `seen` telling a new picture from the one before it. Between turns the picture settles.
+fn fastest_redraw<T: PartialEq>(h: &mut Harness<Browser>, seen: impl Fn(&Harness<Browser>) -> T) -> Duration {
+    let mut fastest = Duration::MAX;
+    for _ in 0..TURNS {
+        settle(h, &seen);
+        let before = seen(h);
+        let start = Instant::now();
+        h.mouse(MouseKind::ScrollDown, 40, PAGE_TOP + 10);
+        until(h, "the page redrawn after the wheel", |h| seen(h) != before);
+        fastest = fastest.min(start.elapsed());
+    }
+    fastest
+}
+
+/// Waits until what `seen` reads has not changed for a while: the page has stopped moving.
+fn settle<T: PartialEq>(h: &mut Harness<Browser>, seen: &impl Fn(&Harness<Browser>) -> T) {
+    let deadline = Instant::now() + PATIENCE;
+    let mut last = seen(h);
+    let mut still = Instant::now();
+    while still.elapsed() < Duration::from_millis(400) {
+        assert!(Instant::now() < deadline, "the page never stopped moving:\n{}", h.screen());
+        h.advance(Duration::from_millis(20));
+        std::thread::sleep(Duration::from_millis(10));
+        let now = seen(h);
+        if now != last {
+            last = now;
+            still = Instant::now();
+        }
+    }
+}
+
+/// The colours of every cell of the page area.
+fn page_cells(h: &Harness<Browser>) -> Vec<(Option<Rgb>, Option<Rgb>)> {
+    let size = h.buffer().area;
+    let top = u16::try_from(PAGE_TOP).unwrap_or_default();
+    (top..size.height)
+        .flat_map(|y| (0..size.width).map(move |x| (x, y)))
+        .map(|(x, y)| (h.fg(x, y), h.bg(x, y)))
+        .collect()
+}
+
+/// A column of pixels down the middle of the picture the page area shows, which a kitty terminal
+/// draws itself.
+fn picture_column(h: &Harness<Browser>) -> Vec<Option<Rgb>> {
+    let Some(picture) = h.app().tab().picture.as_ref() else { return Vec::new() };
+    (0..picture.height()).step_by(8).map(|y| picture.pixel(picture.width() / 2, y)).collect()
+}
+
+#[test]
+fn the_wheel_over_the_page_redraws_its_picture_promptly_in_a_large_window() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let mut h = large_long_page(&scratch, Graphics::HalfBlock);
+    let fastest = fastest_redraw(&mut h, page_cells);
+    assert!(fastest < PROMPT, "the quickest turn of the wheel took {fastest:?} to show");
+    assert!(eval(&h, "scrollY") != json!(0), "and the page itself scrolled");
+}
+
+#[test]
+fn in_a_full_pixel_terminal_the_wheel_brings_a_new_picture_of_the_page_promptly() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let mut h = large_long_page(&scratch, Graphics::Kitty);
+    let fastest = fastest_redraw(&mut h, picture_column);
+    assert!(fastest < PROMPT, "the quickest turn of the wheel took {fastest:?} to bring a new picture");
 }

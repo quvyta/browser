@@ -6,7 +6,7 @@ homepage = "https://quvyta.com/qbrowser/"
 readme = "README.md"
 keywords = ["tui", "terminal", "browser", "web", "chromium"]
 categories = ["command-line-utilities", "web-programming"]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -19,13 +19,21 @@ name = "qbrowser"
 path = "src/lib.rs"
 
 [dependencies]
-quvyta-framework = { version = "0.1.27", features = ["image", "updates"] }
+quvyta-framework = { version = "0.1.28", features = ["image", "updates"] }
 # Only 127.0.0.1 is ever reached through it, so no TLS.
 tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }
 serde_json = "1"
 base64 = "0.22"
 # The same version the framework brings in, so it adds no crate; read for the cell's pixel size.
 crossterm = "0.29.0"
+
+# Every picture of the page passes through the JPEG decoder, and in full-pixel terminals through
+# zlib, on its way to the screen. Unoptimised, as `cargo run` and the tests build them, one frame
+# of a large window took over a second, so the page seemed not to scroll at all; optimised it takes
+# a few milliseconds. Only the dependencies are optimised: qbrowser's own code stays quick to build
+# and easy to debug.
+[profile.dev.package."*"]
+opt-level = 3
 
 [dev-dependencies]
 toml = "0.9"

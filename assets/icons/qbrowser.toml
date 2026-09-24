@@ -7,3 +7,7 @@ name = "qbrowser"
 [icons]
 # nf-md-refresh
 "browser.reload" = { nerd = "\U000F0450", unicode = "⟳", ascii = "R" }
+# nf-md-star_outline: the page is not a bookmark
+"browser.star" = { nerd = "\U000F04D2", unicode = "☆", ascii = "+" }
+# nf-md-star: the page is a bookmark
+"browser.starred" = { nerd = "\U000F04CE", unicode = "★", ascii = "*" }

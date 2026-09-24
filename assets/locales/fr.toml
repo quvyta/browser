@@ -44,6 +44,16 @@ stopped = "Chromium s’est arrêté"
 reason = "Dernier message : {reason}"
 restart = "Redémarrer"
 
+[browser.bookmarks]
+add = "Mettre cette page en favori"
+remove = "Retirer ce favori"
+added = "Ajouté aux favoris"
+removed = "Favori supprimé"
+not-saved = "Les favoris n’ont pas pu être enregistrés"
+more = "Plus"
+open-new-tab = "Ouvrir dans un nouvel onglet"
+delete = "Retirer"
+
 [browser.page]
 cannot-show = "Ce terminal ne peut pas afficher d’images"
 cannot-show-message = "qbrowser affiche les pages web sous forme d’images. Un terminal avec 256 couleurs ou plus les affiche, et un terminal qui comprend le protocole kitty ou sixel les affiche nettes."
@@ -75,3 +85,4 @@ back = "retour"
 forward = "avancer"
 reload = "recharger"
 cancel = "annuler"
+bookmark = "favori"

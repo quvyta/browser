@@ -28,9 +28,17 @@ Where the terminal speaks the kitty graphics protocol or sixel (kitty, WezTerm, 
 | New tab | ctrl+t | `+` |
 | Close the tab | ctrl+w | the tab's `×` |
 | Next, previous tab | ctrl+PgDn, ctrl+PgUp | click the tab |
+| Bookmark the page, or remove it | ctrl+d | the star |
+| Open a bookmark | type part of its name or address, ↓ ↑, enter | click it on the bar; middle click opens it in a new tab |
 | Quit | ctrl+q | |
 
 While the page has the keyboard (after a click on it), every other key goes to the page: Tab moves between its fields, the arrows and PgUp/PgDn scroll it, and pasting pastes into it. Closing the last tab opens an empty one; qbrow ends only with ctrl+q.
+
+## Bookmarks
+
+The star at the end of the address bar keeps the page as a bookmark, and a second press lets it go; ctrl+d does the same. Once there is a bookmark, a bar below the address bar shows them in the order they were added, and the ones that do not fit are under More. A click opens a bookmark in the tab, a middle click in a new tab, and a right click offers both and Remove. Typing in the address bar lists the bookmarks whose name or address holds what you typed; ↓ and ↑ choose one, enter or a click opens it, Esc closes the list and keeps your text, and enter without a choice goes where you typed.
+
+The bookmarks are kept in `~/.local/share/quvyta/browser/bookmarks`, one per line: the address, a tab, and the name.
 
 ## Profile
 

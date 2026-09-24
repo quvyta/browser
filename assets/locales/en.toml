@@ -43,6 +43,16 @@ stopped = "Chromium stopped"
 reason = "It said last: {reason}"
 restart = "Restart"
 
+[browser.bookmarks]
+add = "Bookmark this page"
+remove = "Remove this bookmark"
+added = "Bookmarked"
+removed = "Bookmark removed"
+not-saved = "The bookmarks could not be saved"
+more = "More"
+open-new-tab = "Open in new tab"
+delete = "Remove"
+
 [browser.page]
 cannot-show = "This terminal cannot show pictures"
 cannot-show-message = "qbrowser shows web pages as pictures. A terminal with 256 colours or more shows them, and one that speaks the kitty graphics protocol or sixel shows them sharp."
@@ -74,3 +84,4 @@ back = "back"
 forward = "forward"
 reload = "reload"
 cancel = "cancel"
+bookmark = "bookmark"

@@ -13,3 +13,5 @@ back = "alt+left"
 forward = "alt+right"
 reload = ["ctrl+r", "f5"]
 cancel = "esc"
+# Keeps the page as a bookmark, or lets it go; ctrl+d is what desktop browsers use.
+bookmark = "ctrl+d"

@@ -11,13 +11,15 @@ use std::path::PathBuf;
 use qframe::graphics::Graphics;
 use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, TaskId, Termination, Update, UpdateCheck};
-use qframe::storage::{Family, Preferences, Settings};
+use qframe::storage::{Family, Preferences, Settings, data_dir};
 use qframe::widgets::ImageData;
 
+use crate::bookmarks::Bookmarks;
 use crate::cli::Start;
 use crate::engine::{Engine, Event, StartError, TabId, find_chromium};
 use crate::page_view::PageInput;
 
+mod bookmarks;
 mod engine_link;
 pub mod install;
 mod tabs;
@@ -54,6 +56,8 @@ pub struct Machine {
     pub updates: Option<UpdateFolders>,
     /// The pixel size of a cell; `None` asks the terminal.
     pub cell: Option<(u32, u32)>,
+    /// The file the bookmarks are kept in, in the Quvyta data folder; `None` keeps them in memory.
+    pub bookmarks: Option<PathBuf>,
 }
 
 impl Machine {
@@ -77,6 +81,7 @@ impl Machine {
             config: family.config_dir(),
             updates: UpdateFolders::here(),
             cell: None,
+            bookmarks: data_dir(family.id()).map(|folder| folder.join(APP).join(crate::bookmarks::FILE)),
         }
     }
 }
@@ -145,6 +150,12 @@ pub struct Browser {
     graphics: Graphics,
     /// Whether the keyboard starts in the address bar rather than on the page.
     start_in_location: bool,
+    /// The person's bookmarks.
+    bookmarks: Bookmarks,
+    /// Whether the bookmarks that do not fit on the bar are shown.
+    more_bookmarks: bool,
+    /// The bookmarks the address bar suggests while the person types.
+    suggestions: bookmarks::Suggestions,
 }
 
 /// What the screen starts with: qbrowser itself, its settings file and the shared Quvyta look
@@ -178,6 +189,7 @@ impl Opening {
 impl Browser {
     fn new(machine: Machine, start: &Start) -> Self {
         let first = start.address.as_deref().unwrap_or(BLANK);
+        let bookmarks = machine.bookmarks.as_deref().map(Bookmarks::read).unwrap_or_default();
         Self {
             machine,
             phase: Phase::Starting,
@@ -190,6 +202,9 @@ impl Browser {
             size: Size::new(0, 0),
             graphics: Graphics::HalfBlock,
             start_in_location: start.address.is_none(),
+            bookmarks,
+            more_bookmarks: false,
+            suggestions: bookmarks::Suggestions::default(),
         }
     }
 
@@ -217,9 +232,11 @@ impl Browser {
         self.tab().address()
     }
 
-    /// The page area's size in cells: the screen below the tab strip and the toolbar.
+    /// The page area's size in cells: the screen below the tab strip, the toolbar and the bar of
+    /// bookmarks.
     fn page_cells(&self) -> Size {
-        Size::new(self.size.width, self.size.height.saturating_sub(view::CHROME_ROWS))
+        let above = view::CHROME_ROWS + self.bookmark_rows();
+        Size::new(self.size.width, self.size.height.saturating_sub(above))
     }
 
     /// The page area's size in CSS pixels.
@@ -307,12 +324,14 @@ impl Browser {
     /// The address bar becomes a field holding the address, the keyboard in it.
     fn open_location(&mut self) -> Command<Msg> {
         self.location = Some(self.tab().address().to_owned());
+        self.close_suggestions();
         Command::focus(view::LOCATION)
     }
 
     /// The address bar goes back to showing the address, the keyboard back on the page.
     fn close_location(&mut self) -> Command<Msg> {
         self.location = None;
+        self.close_suggestions();
         Command::focus(view::PAGE)
     }
 
@@ -408,6 +427,20 @@ pub enum Msg {
     Go(String),
     /// Esc outside the page.
     Cancel,
+    /// Keep the page on screen as a bookmark, or let it go when it is one.
+    Bookmark,
+    /// Open the bookmark of this address, in a new tab when true.
+    OpenBookmark(String, bool),
+    /// Take the bookmark of this address out.
+    RemoveBookmark(String),
+    /// Show or hide the bookmarks that do not fit on the bar.
+    MoreBookmarks(bool),
+    /// Move the choice among the address bar's suggestions this many rows.
+    Suggest(isize),
+    /// Open the address bar's suggestion on this row.
+    OpenSuggestion(usize),
+    /// Close the address bar's suggestions, keeping the typed text.
+    CloseSuggestions,
     /// Run the command that installs Chromium.
     Install,
     /// Show the command that installs Chromium.
@@ -475,11 +508,19 @@ impl App for Browser {
                 }
             }
             Msg::LocationTyped(text) => {
-                if let Some(location) = &mut self.location {
-                    *location = text;
+                if self.location.is_some() {
+                    self.suggest(&text);
+                    self.location = Some(text);
                 }
             }
-            Msg::Go(text) => return self.go(&text),
+            Msg::Go(text) => return self.submit(&text),
+            Msg::Bookmark => return self.toggle_bookmark(),
+            Msg::OpenBookmark(url, new_tab) => return self.open_bookmark(&url, new_tab),
+            Msg::RemoveBookmark(url) => return self.remove_bookmark(&url),
+            Msg::MoreBookmarks(open) => self.more_bookmarks = open,
+            Msg::Suggest(step) => self.step_suggestion(step),
+            Msg::OpenSuggestion(row) => return self.open_suggestion(row),
+            Msg::CloseSuggestions => self.close_suggestions(),
             Msg::Install => {
                 if let Phase::Missing(Missing { command: Some(command), .. }) = &self.phase {
                     return command.run();
@@ -516,6 +557,7 @@ impl App for Browser {
             "forward" => Msg::Forward,
             "reload" => Msg::Reload,
             "cancel" => Msg::Cancel,
+            "bookmark" => Msg::Bookmark,
             _ => return None,
         };
         Some(msg)
