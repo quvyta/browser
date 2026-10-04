@@ -74,15 +74,21 @@ impl<Msg> PageView<Msg> {
     }
 }
 
-/// Whether a keymap action stays with qbrowser rather than going to the page. See [`PageView`].
+/// Whether `chord` stays with qbrowser rather than going to the page. See [`PageView`].
 ///
-/// The key overview stays only on a key that writes nothing: `?` is a character a page's field
-/// needs, while F1 writes nothing and is the key a desktop browser gives its help.
-fn leaves_to_the_app(scope: Scope, action: &str, chord: KeyChord) -> bool {
-    match scope {
-        Scope::App => action != "cancel",
-        Scope::Global if action == "help" => !matches!(chord.key, Key::Char(_)),
-        Scope::Global => matches!(action, "quit" | "paste"),
+/// The framework says which keys the application owns. Of the runtime's own keys only quitting
+/// and the clipboard's paste stay: Tab and Shift+Tab move between the page's fields, and the rest
+/// (F12, ctrl+c) are keys pages use themselves. The key overview is not a key the framework
+/// reserves; it stays only on a key that writes nothing: `?` is a character a page's field needs,
+/// while F1 writes nothing and is the key a desktop browser gives its help.
+fn leaves_to_the_app<Msg>(cx: &EventCx<'_, Msg>, chord: KeyChord) -> bool {
+    match cx.reserved_action(&chord) {
+        Some((Scope::App, action)) => action != "cancel",
+        Some((Scope::Global, action)) => matches!(action.as_str(), "quit" | "paste"),
+        None => {
+            matches!(cx.env().keymap().action_for(chord), Some((Scope::Global, "help")))
+                && !matches!(chord.key, Key::Char(_))
+        }
     }
 }
 
@@ -131,9 +137,7 @@ impl<Msg: 'static> Widget<Msg> for PageView<Msg> {
     fn event(&self, cx: &mut EventCx<'_, Msg>, event: &Event) -> bool {
         match event {
             Event::Key(key) => {
-                if let Some((scope, action)) = cx.env().keymap().action_for(key.chord)
-                    && leaves_to_the_app(scope, action, key.chord)
-                {
+                if leaves_to_the_app(cx, key.chord) {
                     return false;
                 }
                 keys::key_press(key).is_some_and(|press| self.send(cx, PageInput::Key(press)))

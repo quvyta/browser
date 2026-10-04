@@ -6,7 +6,7 @@ homepage = "https://quvyta.com/qbrowser/"
 readme = "README.md"
 keywords = ["tui", "terminal", "browser", "web", "chromium"]
 categories = ["command-line-utilities", "web-programming"]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -19,7 +19,7 @@ name = "qbrowser"
 path = "src/lib.rs"
 
 [dependencies]
-quvyta-framework = { version = "0.1.32", features = ["image", "updates"] }
+quvyta-framework = { version = "0.1.33", features = ["image", "updates"] }
 serde_json = "1"
 base64 = "0.22"
 

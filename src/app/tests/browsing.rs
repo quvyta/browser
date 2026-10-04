@@ -172,6 +172,46 @@ fn half_blocks_get_two_pixels_a_cell_and_real_pixels_the_whole_page_area() {
     until(&mut h, "the full picture for a full-pixel terminal", |h| size(h) == Some(full));
 }
 
+#[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
+fn with_cells_not_twice_as_tall_as_wide_the_page_fills_its_area_and_a_click_lands_where_it_is_drawn() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let edges = page("/edges");
+    let mut h = open(&scratch, &edges);
+    // Nine by twenty: a cell narrower than half its height, as many terminal fonts have.
+    h.set_cell_pixels(Some((9, 20)));
+    let size = h.buffer().area;
+    let rows = u32::from(size.height) - u32::try_from(PAGE_TOP).unwrap();
+    // Every column gets its own pixel and the rows more than two, in the viewport's shape.
+    let wanted = (u32::from(size.width), (rows * 20).div_ceil(9));
+    until(&mut h, "a picture of the page for cells of 9 × 20", |h| {
+        h.app().tab().picture.as_ref().is_some_and(|picture| (picture.width(), picture.height()) == wanted)
+    });
+    let row = PAGE_TOP + i32::try_from(rows / 2).unwrap();
+    // Red, blue, a blend of the two where the picture's edge between them is soft, or the ground
+    // where the picture does not reach.
+    let colour = |h: &Harness<Browser>, column: u16| {
+        let at = u16::try_from(row).unwrap();
+        if h.buffer()[(column, at)].symbol() != "▀" {
+            return '.';
+        }
+        match h.fg(column, at) {
+            Some(rgb) if rgb.r > 150 && rgb.g < 70 && rgb.b < 70 => 'r',
+            Some(rgb) if rgb.b > 150 && rgb.r < 70 && rgb.g < 70 => 'b',
+            _ => '~',
+        }
+    };
+    let line: String = (0..size.width).map(|column| colour(&h, column)).collect();
+    // Drawn with the old square half blocks the picture was narrower than the area, and the
+    // ground showed at both sides.
+    assert!(line.starts_with('r') && line.ends_with("bb"), "the page from edge to edge: {line}");
+    assert!(!line.contains('.'), "no ground beside the page: {line}");
+    let bar = i32::try_from(line.find('b').unwrap()).unwrap();
+    h.click(bar, row);
+    until(&mut h, "the click on the bar where it is drawn", |h| eval(h, "went") == json!(1));
+}
+
 /// Turns the wheel down over the page [`TURNS`] times and returns the shortest time from a turn
 /// to `seen` telling a new picture from the one before it. Between turns the picture settles.
 fn fastest_redraw<T: PartialEq>(h: &mut Harness<Browser>, seen: impl Fn(&Harness<Browser>) -> T) -> Duration {

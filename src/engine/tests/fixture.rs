@@ -294,6 +294,12 @@ fn body(path: &str) -> Option<String> {
         "/long" => {
             "<title>Long</title><div style='height:5000px;background:linear-gradient(red,blue)'>long</div>".to_owned()
         }
+        // Red to its edges, with a blue bar three cells of nine pixels wide down the right edge that
+        // counts its clicks.
+        "/edges" => "<title>Edges</title><style>html,body{margin:0;height:100%;background:#c80000}</style>\
+                     <button id=edge style='position:fixed;right:0;top:0;width:27px;height:100%;border:0;padding:0;background:#0000c8'></button>\
+                     <script>let went = 0; edge.addEventListener('click', () => went++);</script>"
+            .to_owned(),
         "/form" => format!("<title>Form</title><input id=field style='{BIG}'>"),
         "/blank" => format!("<title>Blank</title><a id=out target=_blank href=/second style='{BIG}'>Out</a>"),
         "/opener" => {

@@ -170,8 +170,6 @@ pub struct Browser {
     zoom_menu: bool,
     /// The bookmarks the address bar suggests while the person types.
     suggestions: bookmarks::Suggestions,
-    /// The pixel size of a cell as the screen last saw it.
-    seen_cell: engine_link::SeenCell,
     /// The pixel size of a cell the pages are laid out for.
     cell: (u32, u32),
     /// Tabs closed while Chromium was still opening them: the next tabs Chromium reports as opened
@@ -284,7 +282,6 @@ impl Browser {
             more_bookmarks: false,
             zoom_menu: false,
             suggestions: bookmarks::Suggestions::default(),
-            seen_cell: engine_link::SeenCell::default(),
             cell: engine_link::FALLBACK_CELL,
             keeps_session: false,
             closed_unopened: 0,
@@ -350,14 +347,13 @@ impl Browser {
         engine_link::viewport(self.page_cells(), self.cell)
     }
 
-    /// The largest picture of the page this screen can show: two pixels a cell where the
-    /// terminal draws with half blocks or not at all, the page area's full pixels where it draws
-    /// real pixels.
+    /// The largest picture of the page this screen can show: one with a pixel for every half
+    /// block where the terminal draws with half blocks or not at all, the page area's full pixels
+    /// where it draws real pixels.
     fn picture_limit(&self) -> Option<(u32, u32)> {
-        let cells = self.page_cells();
         match self.graphics {
             Graphics::Kitty | Graphics::Sixel => None,
-            _ => Some((u32::from(cells.width), u32::from(cells.height) * 2)),
+            _ => Some(engine_link::half_block_picture(self.page_cells(), self.cell)),
         }
     }
 
@@ -392,7 +388,7 @@ impl Browser {
                 self.engine = Some(engine);
                 self.phase = Phase::Running;
                 self.limit_pictures();
-                let (id, pump) = engine_link::pump(events, self.seen_cell.clone(), self.cell);
+                let (id, pump) = engine_link::pump(events);
                 self.pump = Some(id);
                 for index in 0..self.tabs.len() {
                     self.ask_chromium(index);
@@ -710,6 +706,13 @@ impl App for Browser {
 
     fn resized(&self, size: Size) -> Option<Msg> {
         Some(Msg::Resized(size))
+    }
+
+    // A change of font size alone keeps the columns and rows, so no resize reports it; the page is
+    // laid out for the new cell all the same, else pictures are drawn at the wrong scale and
+    // clicks land beside what was clicked.
+    fn cell_pixels(&self, cell: Option<(u16, u16)>) -> Option<Msg> {
+        Some(Msg::Cell(engine_link::cell_pixels(cell)))
     }
 
     fn graphics(&self, graphics: Graphics) -> Option<Msg> {

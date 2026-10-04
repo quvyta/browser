@@ -229,11 +229,21 @@ fn typing_reaches_the_page_with_its_text_and_tab_stays_there() {
 #[test]
 fn keys_the_page_uses_as_shortcuts_reach_it_without_text() {
     let mut screen = focused();
-    screen.press("ctrl+a").press("esc").press("f12");
+    // F12 and alt+b are keys the framework's runtime owns elsewhere; on a page they are the page's.
+    screen.press("ctrl+a").press("esc").press("f12").press("alt+b");
     let keys: Vec<(&str, Option<&str>, Modifiers)> =
         screen.app().keys().iter().map(|press| (press.key.as_str(), press.text.as_deref(), press.modifiers)).collect();
     let ctrl = Modifiers { ctrl: true, ..Modifiers::default() };
-    assert_eq!(keys, [("a", None, ctrl), ("Escape", None, Modifiers::default()), ("F12", None, Modifiers::default())]);
+    let alt = Modifiers { alt: true, ..Modifiers::default() };
+    assert_eq!(
+        keys,
+        [
+            ("a", None, ctrl),
+            ("Escape", None, Modifiers::default()),
+            ("F12", None, Modifiers::default()),
+            ("b", None, alt)
+        ]
+    );
 }
 
 #[test]

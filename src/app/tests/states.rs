@@ -151,7 +151,8 @@ fn quitting_ends_every_chromium_process() {
     assert!(!processes_mentioning(&profile).is_empty(), "Chromium runs on the profile");
     h.press("ctrl+q");
     assert!(h.quit_requested());
-    assert!(processes_mentioning(&profile).is_empty(), "nothing runs on the profile once qbrowser has quit");
+    // Killed helpers can take a moment to leave on a loaded machine; one that never does fails.
+    wait_until_none_mention(&profile);
     // Held on purpose until here: the harness still has the screen, only quitting ended Chromium.
     drop(h);
 }

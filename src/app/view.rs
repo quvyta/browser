@@ -41,7 +41,6 @@ const SMALLEST: Size = Size { width: 30, height: 8 };
 impl Browser {
     /// The whole screen at the size it is drawn in.
     pub(super) fn screen(&self, ui: &mut View<'_, Msg>) {
-        self.seen_cell.set(ui.env().cell_pixels());
         let size = ui.size();
         if size.width < SMALLEST.width || size.height < SMALLEST.height {
             ui.add(EmptyState::new(t!("browser.too-small"))).fill();

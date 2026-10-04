@@ -2,6 +2,16 @@
 
 Every release of quvyta-browser, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## 0.2.1 - 2026-10-04
+
+### Fixed
+
+- In a terminal that reports the size of its cells, a page drawn with half blocks fills the page area from edge to edge whatever the font's shape, and a click lands on what is drawn under it; with cells narrower than half their height the picture used to leave a strip of ground at both sides.
+
+### Changed
+
+- A change of font size reaches qbrow from the framework itself, so while nothing happens on the page qbrow waits without looking twenty times a second.
+
 ## 0.2.0 - 2026-10-04
 
 ### Added
