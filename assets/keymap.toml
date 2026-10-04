@@ -2,6 +2,11 @@
 # shift+Tab too; these, and the framework's ctrl+q, stay with qbrowser. Esc is `cancel` for the
 # address bar, but the page keeps it while it has focus: pages close their own dialogs with it.
 
+[global]
+# The key overview: `?` as in every Quvyta application, and F1 as in a desktop browser. While the
+# page has the keyboard `?` is the page's, a character its fields need, and F1 opens the overview.
+help = ["?", "f1"]
+
 [app]
 new-tab = "ctrl+t"
 close-tab = "ctrl+w"
@@ -15,3 +20,20 @@ reload = ["ctrl+r", "f5"]
 cancel = "esc"
 # Keeps the page as a bookmark, or lets it go; ctrl+d is what desktop browsers use.
 bookmark = "ctrl+d"
+# The size of the writing, as in every desktop browser. ctrl+= is ctrl++ without the shift, on
+# the key they share. Most terminals send ctrl+- as the same byte as ctrl+_ (0x1F), so ctrl+_ is
+# zooming out: bound to zooming in, the minus key made the page larger.
+zoom-in = ["ctrl++", "ctrl+="]
+zoom-out = ["ctrl+-", "ctrl+_"]
+zoom-reset = "ctrl+0"
+
+# The settings screen, in the place of the page; the same key closes it.
+settings = "ctrl+,"
+# The pages this profile has seen, newest first; ctrl+h is what desktop browsers use for it.
+history = "ctrl+h"
+# Copies what the page has selected. With nothing selected it is the page's own chord again.
+copy = "ctrl+c"
+
+# Reading mode: the page's own text where its picture is. F9 is Firefox's reading key and every
+# terminal sends it. The same key closes it again.
+reader = "f9"

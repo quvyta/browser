@@ -1,20 +1,14 @@
 //! The page area: the picture Chromium draws, and the mouse, the keys and pastes that go back to
 //! the page.
 
-use std::time::Duration;
-
 use qframe::event::{Event, MouseButton, MouseEvent, MouseKind};
 use qframe::geometry::{Rect, Size};
-use qframe::keymap::Scope;
+use qframe::keymap::{Key, KeyChord, Scope};
 use qframe::widget::{EventCx, MeasureCx, PaintCx, Widget};
 use qframe::widgets::{Fit, Image, ImageData};
 
 use crate::engine::input::{Button, KeyPress, Modifiers, Mouse};
 use crate::keys;
-
-/// Two presses of the same button on the same cell closer together than this are a double
-/// click, as on a desktop; a third makes a triple click, which selects a paragraph.
-const MULTI_CLICK: Duration = Duration::from_millis(400);
 
 /// How far one step of the wheel scrolls, in CSS pixels: three lines of twenty, close to what
 /// desktop browsers scroll.
@@ -50,8 +44,8 @@ pub enum PageInput {
 /// while it has focus every key and paste goes to the page, Tab and Shift+Tab too, since that is
 /// how a page moves between its fields. Only qbrowser's own keys stay with qbrowser: those bound
 /// to an application action in the keymap (new tab, the address, back, reload…), the global
-/// `quit`, and the global `paste`, which the runtime answers by reading the clipboard and handing
-/// the text back as a paste. `cancel` is the exception among the application's keys: Esc belongs
+/// `quit`, the global `paste`, which the runtime answers by reading the clipboard and handing
+/// the text back as a paste, and the key overview on F1. `cancel` is the exception among the application's keys: Esc belongs
 /// to the page, which closes its own dialogs with it.
 pub struct PageView<Msg> {
     picture: Option<ImageData>,
@@ -81,18 +75,21 @@ impl<Msg> PageView<Msg> {
 }
 
 /// Whether a keymap action stays with qbrowser rather than going to the page. See [`PageView`].
-fn leaves_to_the_app(scope: Scope, action: &str) -> bool {
+///
+/// The key overview stays only on a key that writes nothing: `?` is a character a page's field
+/// needs, while F1 writes nothing and is the key a desktop browser gives its help.
+fn leaves_to_the_app(scope: Scope, action: &str, chord: KeyChord) -> bool {
     match scope {
         Scope::App => action != "cancel",
+        Scope::Global if action == "help" => !matches!(chord.key, Key::Char(_)),
         Scope::Global => matches!(action, "quit" | "paste"),
     }
 }
 
-/// The last press, to count the presses of a double or triple click.
-#[derive(Default)]
-struct Presses {
-    /// The button, the cell, when it went down and how many presses in a row it was.
-    last: Option<(Button, u16, u16, Duration, u8)>,
+/// The page's count for the framework's run of presses: a double click selects a word and a
+/// triple click a paragraph, and a fourth press starts the run over, as on a desktop.
+fn clicks(run: u8) -> u8 {
+    (run.max(1) - 1) % 3 + 1
 }
 
 fn button(button: MouseButton) -> Button {
@@ -135,7 +132,7 @@ impl<Msg: 'static> Widget<Msg> for PageView<Msg> {
         match event {
             Event::Key(key) => {
                 if let Some((scope, action)) = cx.env().keymap().action_for(key.chord)
-                    && leaves_to_the_app(scope, action)
+                    && leaves_to_the_app(scope, action, key.chord)
                 {
                     return false;
                 }
@@ -151,30 +148,10 @@ impl<Msg: 'static> Widget<Msg> for PageView<Msg> {
                         // Keeps the drag and the release coming here when the pointer leaves the
                         // area with the button held, as a selection on the page does.
                         cx.capture_pointer();
-                        let pressed = button(pressed);
-                        let now = cx.now();
-                        let presses = cx.memory::<Presses>();
-                        let clicks = match presses.last {
-                            Some((last, at_column, at_row, at, count))
-                                if last == pressed
-                                    && (at_column, at_row) == (column, row)
-                                    && now.saturating_sub(at) < MULTI_CLICK =>
-                            {
-                                count % 3 + 1
-                            }
-                            _ => 1,
-                        };
-                        presses.last = Some((pressed, column, row, now, clicks));
-                        Mouse::Pressed { button: pressed, clicks }
+                        Mouse::Pressed { button: button(pressed), clicks: clicks(cx.clicks()) }
                     }
                     MouseKind::Up(released) => {
-                        let released = button(released);
-                        let clicks = cx
-                            .memory::<Presses>()
-                            .last
-                            .filter(|(last, ..)| *last == released)
-                            .map_or(1, |(.., count)| count);
-                        Mouse::Released { button: released, clicks }
+                        Mouse::Released { button: button(released), clicks: clicks(cx.clicks()) }
                     }
                     MouseKind::Drag(held) => Mouse::Moved { held: Some(button(held)) },
                     MouseKind::Moved => Mouse::Moved { held: None },

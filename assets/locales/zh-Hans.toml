@@ -22,6 +22,7 @@ back = "后退"
 forward = "前进"
 reload = "重新加载此页面"
 stop = "停止加载"
+reader = "阅读模式"
 
 [browser.address]
 label = "地址"
@@ -29,16 +30,16 @@ placeholder = "搜索或输入地址"
 
 [browser.profile]
 temporary = "临时配置"
-temporary-explained = "另一个 qbrowser 正在使用你的配置文件，所以这个窗口使用了自己的一个。关闭时会删除它的 cookie 和登录状态。"
+temporary-explained = "另一个 qbrow 正在使用你的配置文件，所以这个窗口使用了自己的一个。关闭时会删除它的 cookie 和登录状态。"
 
 [browser.chromium]
 missing = "未找到 Chromium"
-missing-message = "qbrowser 用 Chromium 渲染网页，但这台电脑上没有安装。"
+missing-message = "qbrow 用 Chromium 渲染网页，但这台电脑上没有安装。"
 install = "在此安装"
 show-command = "显示命令"
 command = "此命令安装 Chromium："
 still-missing = "仍未找到 Chromium。如果它装在别处，请把 QBROW_CHROMIUM 设为它的路径。"
-unknown-system = "qbrowser 不知道这个系统如何安装程序。请按你系统的方式安装 Chromium 或 Chrome，或把 QBROW_CHROMIUM 设为其中一个的路径，然后重新启动 qbrowser。"
+unknown-system = "qbrow 不知道这个系统如何安装程序。请按你系统的方式安装 Chromium 或 Chrome，或把 QBROW_CHROMIUM 设为其中一个的路径，然后重新启动 qbrow。"
 failed = "Chromium 无法启动"
 stopped = "Chromium 已停止"
 reason = "它最后说：{reason}"
@@ -56,7 +57,29 @@ delete = "移除"
 
 [browser.page]
 cannot-show = "此终端无法显示图片"
-cannot-show-message = "qbrowser 把网页显示为图片。支持 256 色或更多颜色的终端可以显示，支持 kitty 图形协议或 sixel 的终端显示更清晰。"
+cannot-show-message = "qbrow 把网页显示为图片。支持 256 色或更多颜色的终端可以显示，支持 kitty 图形协议或 sixel 的终端显示更清晰。"
+
+[browser.reader]
+open = "在阅读模式中打开"
+image = "图片"
+nothing = "这个页面没有可读的内容"
+nothing-message = "正文只有寥寥数语，其余都是菜单和按钮。作为文字页面来读，说出的比页面本身还少。"
+back = "返回页面"
+failed = "无法阅读这个页面"
+reason = "它说：{reason}"
+
+[browser.help]
+page = "其他按键都交给页面"
+
+[browser.dialog]
+says = "{host} 的消息"
+asks = "{host} 的问题"
+ok = "确定"
+cancel = "取消"
+leave-title = "要离开此页面吗？"
+leave-message = "您在此页面上输入的内容可能不会被保存。"
+leave = "离开"
+stay = "留下"
 
 [browser.cli]
 help = """
@@ -65,13 +88,13 @@ qbrow {version}：终端里的真正网页浏览器
 用法: qbrow [ADDRESS]
 
   ADDRESS            一个网址、本机上的文件，或用 DuckDuckGo 搜索的词语。
-                     不带参数时 qbrowser 打开一个空白标签页。
+                     不带参数时 qbrow 打开一个空白标签页。
   --profile FOLDER   把 cookie 和登录状态保存在 FOLDER，而不是默认位置
   --version          打印版本号
   --help             打印这份帮助
 
-qbrowser 用 Chromium 或 Chrome 渲染页面，从 PATH 或 QBROW_CHROMIUM 查找。
-每天启动时 qbrowser 会询问 crates.io 是否有新版本；可在设置中关闭。"""
+qbrow 用 Chromium 或 Chrome 渲染页面，从 PATH 或 QBROW_CHROMIUM 查找。
+每天启动时 qbrow 会询问 crates.io 是否有新版本；可在设置中关闭。"""
 unknown = "qbrow：未知选项 {argument}；请查看 qbrow --help"
 no-profile-folder = "qbrow：--profile 后需要跟一个文件夹"
 
@@ -86,3 +109,48 @@ forward = "前进"
 reload = "重新加载"
 cancel = "取消"
 bookmark = "书签"
+zoom-in = "放大"
+zoom-out = "缩小"
+zoom-reset = "重置缩放"
+settings = "设置"
+history = "历史记录"
+copy = "复制"
+reader = "阅读模式"
+
+[browser.zoom]
+level = "缩放 {n}%"
+in = "放大"
+out = "缩小"
+reset = "重置"
+forgotten = "缩放比例不会在两次启动之间保留。"
+
+# 设置界面：qbrow 自己的行，以及它提供的搜索引擎名称。
+[browser.settings]
+title = "设置"
+heading = "浏览"
+search-engine = "搜索引擎"
+search-engine-text = "在地址栏输入网址以外的文字时，地址栏会怎么做。"
+start-page = "起始页"
+start-page-blank = "空白：新标签页打开一个空白页面，键盘停在地址栏里。"
+start-page-opens = "新标签页将打开 {address}"
+start-page-searches = "这是文字而不是网址：新标签页会用 {engine} 搜索"
+start-page-placeholder = "网址或文字"
+
+[browser.search-engine]
+duckduckgo = "DuckDuckGo"
+brave = "Brave"
+mojeek = "Mojeek"
+
+[browser.history]
+title = "历史记录"
+empty = "还没有访问过任何页面"
+not-saved = "无法保存历史记录"
+today = "今天"
+yesterday = "昨天"
+back-list = "标签页去过的地方"
+forward-list = "标签页可以去的地方"
+delete = "把这个页面从历史记录中移除？"
+delete-message = "{page} 将不再出现在历史记录中。"
+
+[browser.menu]
+copy-address = "复制地址"

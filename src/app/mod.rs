@@ -12,30 +12,41 @@ use qframe::graphics::Graphics;
 use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, TaskId, Termination, Update, UpdateCheck};
 use qframe::storage::{Family, Preferences, Settings, data_dir};
-use qframe::widgets::ImageData;
+use qframe::widgets::{Appearance, AppearanceChange, ImageData};
 
+use crate::address::SearchEngine;
 use crate::bookmarks::Bookmarks;
 use crate::cli::Start;
-use crate::engine::{Engine, Event, StartError, TabId, find_chromium};
+use crate::engine::{Button, Engine, Event, Mouse, Reading, StartError, TabId, find_chromium};
 use crate::page_view::PageInput;
 
 mod bookmarks;
+mod dialog;
 mod engine_link;
+mod history;
 pub mod install;
+mod menu;
+mod reader;
+mod scroller;
+mod select;
+mod session;
+mod settings;
 mod tabs;
 mod view;
+mod zoom;
 
 pub use engine_link::Handover;
 use engine_link::StartResult;
 use install::InstallCommand;
+use settings::{Row, SEARCH_ENGINE, START_PAGE};
 use tabs::{BLANK, Tab};
 
 /// qbrowser's name among the Quvyta apps: its settings file is `browser.conf` in the shared
 /// Quvyta folder and its profile lives in the Quvyta state folder under `browser`.
 pub const APP: &str = "browser";
 
-/// What qbrowser knows about the machine it runs on: where Chromium and the profile are, and the
-/// size of a cell in pixels.
+/// What qbrowser knows about the machine it runs on: where Chromium, the profile, the settings and
+/// the bookmarks are.
 ///
 /// Everything the screen reads from the environment is here, so a test hands it a machine made
 /// of temporary folders and nothing reaches the person's own profile, settings or desktop.
@@ -49,13 +60,14 @@ pub struct Machine {
     pub profile_home: PathBuf,
     /// Where a temporary profile is made when the profile is in use by another qbrowser.
     pub temp_root: PathBuf,
+    /// More command-line switches for Chromium; none on a real machine (see
+    /// [`crate::engine::Options::extra_arguments`]).
+    pub chromium_arguments: Vec<OsString>,
     /// The shared Quvyta folder, which holds `browser.conf` and the Quvyta-wide switches; `None`
     /// keeps every change in memory.
     pub config: Option<PathBuf>,
     /// Where the update notice is read and the last question remembered; `None` asks nothing.
     pub updates: Option<UpdateFolders>,
-    /// The pixel size of a cell; `None` asks the terminal.
-    pub cell: Option<(u32, u32)>,
     /// The file the bookmarks are kept in, in the Quvyta data folder; `None` keeps them in memory.
     pub bookmarks: Option<PathBuf>,
 }
@@ -78,9 +90,9 @@ impl Machine {
             path_var: var("PATH"),
             profile_home,
             temp_root,
+            chromium_arguments: Vec::new(),
             config: family.config_dir(),
             updates: UpdateFolders::here(),
-            cell: None,
             bookmarks: data_dir(family.id()).map(|folder| folder.join(APP).join(crate::bookmarks::FILE)),
         }
     }
@@ -154,8 +166,61 @@ pub struct Browser {
     bookmarks: Bookmarks,
     /// Whether the bookmarks that do not fit on the bar are shown.
     more_bookmarks: bool,
+    /// Whether the zoom button's list is open.
+    zoom_menu: bool,
     /// The bookmarks the address bar suggests while the person types.
     suggestions: bookmarks::Suggestions,
+    /// The pixel size of a cell as the screen last saw it.
+    seen_cell: engine_link::SeenCell,
+    /// The pixel size of a cell the pages are laid out for.
+    cell: (u32, u32),
+    /// Tabs closed while Chromium was still opening them: the next tabs Chromium reports as opened
+    /// on qbrow's own request are closed at once instead of taking a place on the strip.
+    closed_unopened: usize,
+    /// Whether this window keeps the open tabs for the next start: it runs on the persistent
+    /// profile.
+    keeps_session: bool,
+    /// `browser.conf`, qbrowser's own file: the shared look's keys and the two of its own.
+    settings: Settings,
+    /// The rows the whole ecosystem shares. It is held rather than built per frame, so what the
+    /// person is doing on them — an open list, a reason a change was not saved — survives another
+    /// application changing the shared file.
+    appearance: Appearance,
+    /// Which search engine the address bar searches words with.
+    search_engine: SearchEngine,
+    /// The address a new empty tab opens, as it was typed; empty is the default.
+    start_page: String,
+    /// Whether the settings screen is open in the place of the page.
+    settings_open: bool,
+    /// Whether the key overview is on screen.
+    help_open: bool,
+    /// Which of qbrowser's own rows a change could not be saved under, and why, until the next
+    /// change.
+    not_saved: Option<(Row, String)>,
+    /// Whether the pages this profile has seen are on the screen.
+    history_open: bool,
+    /// The row the arrows are on in the history screen, its day's headings counted out.
+    history_at: Option<usize>,
+    /// The pages this profile has seen, newest first.
+    visits: history::Visits,
+    /// The file the visits are kept in, beside the profile; `None` keeps them in memory.
+    history_file: Option<PathBuf>,
+    /// The list beside an arrow, and the row the arrows chose in it.
+    steps: history::Steps,
+    /// Whether the press now opening a step or a visit is a middle one, which opens it in a new tab.
+    /// The framework's list answers a press with the row under the pointer and nothing else about
+    /// it, so the press before it says which kind of press this was and the one after opens the
+    /// row.
+    middle: bool,
+    /// The address of the link under the pointer of the last right press, and the tab the page
+    /// answered it for: another tab's answer is not this screen's, and the address is dropped
+    /// when that tab navigates or goes.
+    link: Option<(TabId, String)>,
+    /// The list of a page's select that qbrow shows itself, while it is open.
+    drop_down: Option<select::DropDown>,
+    /// A left press on a select went to its list and not to the page, so the release that ends
+    /// it is not sent either: the page never hears half a click.
+    held_by_list: bool,
 }
 
 /// What the screen starts with: qbrowser itself, its settings file and the shared Quvyta look
@@ -177,18 +242,31 @@ impl Opening {
         let i18n = crate::locales::i18n();
         let (settings, preferences) = match &machine.config {
             Some(folder) => (
-                Settings::open(folder.join(format!("{APP}.conf"))).member_of(&family),
+                Settings::open(folder.join(format!("{APP}.conf")))
+                    .member_of(&family)
+                    .schema(settings::schema())
+                    .self_heal(true),
                 family.preferences_in(folder, APP, &i18n),
             ),
             None => (Settings::in_memory(), family.preferences(APP, &i18n)),
         };
-        Self { browser: Browser::new(machine, start), settings, preferences }
+        let appearance = match &machine.config {
+            Some(folder) => Appearance::new(family, APP, preferences.clone()).in_folder(folder),
+            None => Appearance::new(family, APP, preferences.clone()).without_saving(),
+        };
+        let browser = Browser::new(machine, start, settings.clone(), appearance);
+        Self { browser, settings, preferences }
     }
 }
 
 impl Browser {
-    fn new(machine: Machine, start: &Start) -> Self {
-        let first = start.address.as_deref().unwrap_or(BLANK);
+    fn new(machine: Machine, start: &Start, settings: Settings, appearance: Appearance) -> Self {
+        let search_engine = SearchEngine::named(&settings.get_or(SEARCH_ENGINE, String::new()));
+        let start_page: String = settings.get_or(START_PAGE, String::new());
+        // An address on the command line wins; without one the start page opens, and the empty
+        // page with the keyboard in the address bar when there is no start page to open.
+        let typed = start.address.clone();
+        let first = typed.clone().unwrap_or_else(|| settings::start_address(&start_page, search_engine));
         let bookmarks = machine.bookmarks.as_deref().map(Bookmarks::read).unwrap_or_default();
         Self {
             machine,
@@ -196,15 +274,36 @@ impl Browser {
             engine: None,
             pump: None,
             temporary: false,
-            tabs: vec![Tab::opening(first)],
+            tabs: vec![Tab::opening(&first)],
             active: 0,
             location: None,
             size: Size::new(0, 0),
             graphics: Graphics::HalfBlock,
-            start_in_location: start.address.is_none(),
+            start_in_location: typed.is_none() && first == BLANK,
             bookmarks,
             more_bookmarks: false,
+            zoom_menu: false,
             suggestions: bookmarks::Suggestions::default(),
+            seen_cell: engine_link::SeenCell::default(),
+            cell: engine_link::FALLBACK_CELL,
+            keeps_session: false,
+            closed_unopened: 0,
+            settings,
+            appearance,
+            search_engine,
+            start_page,
+            settings_open: false,
+            help_open: false,
+            not_saved: None,
+            history_open: false,
+            history_at: None,
+            visits: history::Visits::default(),
+            history_file: None,
+            steps: history::Steps::default(),
+            middle: false,
+            link: None,
+            drop_down: None,
+            held_by_list: false,
         }
     }
 
@@ -232,6 +331,13 @@ impl Browser {
         self.tab().address()
     }
 
+    /// The address the tab on screen was opened on, the blank page included, which is what a test
+    /// asks for about the start page.
+    #[cfg(test)]
+    pub(crate) fn tab_url(&self) -> &str {
+        &self.tab().url
+    }
+
     /// The page area's size in cells: the screen below the tab strip, the toolbar and the bar of
     /// bookmarks.
     fn page_cells(&self) -> Size {
@@ -241,7 +347,25 @@ impl Browser {
 
     /// The page area's size in CSS pixels.
     fn viewport(&self) -> (u32, u32) {
-        engine_link::viewport(self.page_cells(), engine_link::cell_pixels(&self.machine))
+        engine_link::viewport(self.page_cells(), self.cell)
+    }
+
+    /// The largest picture of the page this screen can show: two pixels a cell where the
+    /// terminal draws with half blocks or not at all, the page area's full pixels where it draws
+    /// real pixels.
+    fn picture_limit(&self) -> Option<(u32, u32)> {
+        let cells = self.page_cells();
+        match self.graphics {
+            Graphics::Kitty | Graphics::Sixel => None,
+            _ => Some((u32::from(cells.width), u32::from(cells.height) * 2)),
+        }
+    }
+
+    /// Tells Chromium how large a picture is worth sending.
+    fn limit_pictures(&self) {
+        if let Some(engine) = &self.engine {
+            engine.set_picture_limit(self.picture_limit());
+        }
     }
 
     /// The question for a newer version of qbrowser, when the Quvyta-wide update notice is on. A
@@ -263,12 +387,18 @@ impl Browser {
         match result {
             Ok((engine, events)) => {
                 self.temporary = engine.profile().temporary;
+                self.open_history(engine.profile());
+                let restored = !self.temporary && self.restore_session();
                 self.engine = Some(engine);
                 self.phase = Phase::Running;
-                let (id, pump) = engine_link::pump(events);
+                self.limit_pictures();
+                let (id, pump) = engine_link::pump(events, self.seen_cell.clone(), self.cell);
                 self.pump = Some(id);
                 for index in 0..self.tabs.len() {
                     self.ask_chromium(index);
+                }
+                if restored {
+                    return Command::batch([pump, Command::focus(view::PAGE)]);
                 }
                 pump
             }
@@ -304,6 +434,7 @@ impl Browser {
     fn restart(&mut self) -> Command<Msg> {
         let stop = self.stop_engine();
         self.tabs = self.tabs.iter().map(|tab| Tab::opening(&tab.url)).collect();
+        self.closed_unopened = 0;
         self.phase = Phase::Starting;
         self.temporary = false;
         Command::batch([stop, engine_link::start(&self.machine)])
@@ -337,7 +468,7 @@ impl Browser {
 
     /// Goes where the address bar's text leads, in the active tab.
     fn go(&mut self, typed: &str) -> Command<Msg> {
-        let destination = crate::address::destination(typed);
+        let destination = crate::address::destination(typed, self.search_engine);
         if destination.is_empty() {
             return Command::none();
         }
@@ -363,8 +494,32 @@ impl Browser {
     }
 
     /// Hands the page what the person did on it.
-    fn page_input(&self, input: PageInput) {
-        let cell = engine_link::cell_pixels(&self.machine);
+    fn page_input(&mut self, input: PageInput) -> Command<Msg> {
+        // A select's list is drawn by qbrow, since headless Chromium never draws it: a left press
+        // or a list key on one opens it instead of reaching the page. Every other press goes on as
+        // it came, in the order it came, with its own click count.
+        match &input {
+            PageInput::Mouse { mouse: Mouse::Pressed { button: Button::Left, .. }, column, row, .. } => {
+                if let Some(opened) = self.open_drop_down(Some((*column, *row))) {
+                    self.held_by_list = true;
+                    return opened;
+                }
+            }
+            PageInput::Mouse { mouse: Mouse::Moved { held: Some(Button::Left) }, .. } if self.held_by_list => {
+                return Command::none();
+            }
+            PageInput::Mouse { mouse: Mouse::Released { button: Button::Left, .. }, .. } if self.held_by_list => {
+                self.held_by_list = false;
+                return Command::none();
+            }
+            PageInput::Key(press) if select::opens_list(press) => {
+                if let Some(opened) = self.open_drop_down(None) {
+                    return opened;
+                }
+            }
+            _ => {}
+        }
+        let cell = self.cell;
         self.on_page(|engine, id| match input {
             PageInput::Mouse { mouse, column, row, modifiers } => {
                 let (x, y) = engine_link::cell_middle(column, row, cell);
@@ -375,11 +530,13 @@ impl Browser {
             PageInput::Key(press) => engine.key(id, &press),
             PageInput::Paste(text) => engine.insert_text(id, &text),
         });
+        Command::none()
     }
 
     /// The page area took a new size: every tab is laid out for it.
     fn resized(&mut self, size: Size) {
         self.size = size;
+        self.limit_pictures();
         for id in self.tabs.iter().filter_map(|tab| tab.id.as_ref()) {
             self.size_tab(id);
         }
@@ -393,6 +550,8 @@ pub enum Msg {
     Resized(Size),
     /// The terminal draws pictures this way.
     Graphics(Graphics),
+    /// A cell is this many pixels now, wide and high.
+    Cell((u32, u32)),
     /// Chromium started, or why not.
     Started(StartResult),
     /// Chromium reported something; frames come as [`Msg::Picture`].
@@ -419,6 +578,19 @@ pub enum Msg {
     Reload,
     /// Stop loading the page.
     Stop,
+    /// The page's dialog was answered: OK (or "Leave") when true.
+    DialogAnswer(bool),
+    /// The text of a page's prompt changed.
+    DialogTyped(String),
+    /// Reading mode in the place of the page, or the page back.
+    Reader(bool),
+    /// A page was read, or why it could not be: its words, read off the drawing thread.
+    Read {
+        /// The tab whose page was read.
+        tab: TabId,
+        /// What the page had to say, or the reason there is no reading.
+        result: Result<Reading, String>,
+    },
     /// The address bar becomes a field, or goes back to the address.
     Location(bool),
     /// The text of the address field changed.
@@ -435,12 +607,8 @@ pub enum Msg {
     RemoveBookmark(String),
     /// Show or hide the bookmarks that do not fit on the bar.
     MoreBookmarks(bool),
-    /// Move the choice among the address bar's suggestions this many rows.
-    Suggest(isize),
     /// Open the address bar's suggestion on this row.
     OpenSuggestion(usize),
-    /// Close the address bar's suggestions, keeping the typed text.
-    CloseSuggestions,
     /// Run the command that installs Chromium.
     Install,
     /// Show the command that installs Chromium.
@@ -449,6 +617,73 @@ pub enum Msg {
     Installed(HandoffOutcome),
     /// Start Chromium again.
     Restart,
+    /// Draw the page one step larger.
+    ZoomIn,
+    /// Draw the page one step smaller.
+    ZoomOut,
+    /// Draw the page the size of the area it is drawn in.
+    ZoomReset,
+    /// Show or hide the zoom button's list.
+    ZoomMenu(bool),
+    /// The settings screen is shown, or taken back.
+    Settings(bool),
+    /// The key overview is shown, or taken back.
+    Help(bool),
+    /// A row of the framework's shared look was changed.
+    Appearance(AppearanceChange),
+    /// The search engine the address bar searches with was chosen.
+    SearchEngine(SearchEngine),
+    /// The start page a new empty tab opens was typed.
+    StartPage(String),
+    /// Another Quvyta application changed the shared look.
+    Preferences(Preferences),
+    /// A change of one of qbrowser's own rows was written, or could not be.
+    Saved(Row, std::result::Result<(), String>),
+    /// ctrl+h: show the pages this profile has seen, and close them again when they are on the
+    /// screen.
+    History,
+    /// Esc: the history screen goes back to the page as it was.
+    CloseHistory,
+    /// The list beside an arrow opens, or the one that is open closes; the `None` side closes
+    /// whichever is open.
+    Steps(history::Arrow),
+    /// The arrows moved in the list beside an arrow, or a press chose a row in it.
+    FocusStep(usize),
+    /// Enter or a press on a row of the list beside an arrow: go to that step of the tab's history.
+    OpenStep(usize),
+    /// A middle press, said before the row under it: a middle click opens in a new tab.
+    MiddleStep,
+    /// The history screen's focus moved to this row.
+    FocusVisit(usize),
+    /// Enter or a press on a row of the history screen: open the visit on that row.
+    OpenVisit(usize),
+    /// Delete on the history screen: ask whether the visit on that row may be taken out.
+    ForgetVisit(usize),
+    /// The question was answered: the visit is taken out of the list and out of the file.
+    RemoveVisit(usize),
+    /// Copy the page's selection as it would be pasted into a field.
+    Copy,
+    /// Copy the page's selection exactly as the page reported it.
+    CopyRaw,
+    /// Copy a link's address to the clipboard.
+    CopyAddress(String),
+    /// Open a link's address in a new tab.
+    OpenLink(String),
+    /// A right press on the page, on this cell of the page area.
+    PageRight {
+        /// The column, from the page area's left edge.
+        column: u16,
+        /// The row, from the page area's top edge.
+        row: u16,
+    },
+    /// The arrows moved to this row of a select's list.
+    HighlightOption(usize),
+    /// This row of a select's list was chosen, by Enter or a click.
+    ChooseOption(usize),
+    /// A letter was typed in a select's list.
+    JumpToOption(char),
+    /// A select's list closes with nothing chosen: Esc or a press outside it.
+    CloseOptions,
     /// A newer version of qbrowser is out.
     NewVersion(Update),
     /// qbrowser is ending: Chromium is ended first.
@@ -484,15 +719,22 @@ impl App for Browser {
     fn update(&mut self, msg: Msg) -> Command<Msg> {
         match msg {
             Msg::Resized(size) => self.resized(size),
-            Msg::Graphics(graphics) => self.graphics = graphics,
+            Msg::Graphics(graphics) => {
+                self.graphics = graphics;
+                self.limit_pictures();
+            }
+            Msg::Cell(cell) => {
+                self.cell = cell;
+                self.resized(self.size);
+            }
             Msg::Started(result) => return self.started(&result),
             Msg::Engine(event) => return self.engine_event(event),
             Msg::Picture(id, picture) => self.picture(&id, picture),
-            Msg::Page(input) => self.page_input(input),
+            Msg::Page(input) => return self.page_input(input),
             Msg::SelectTab(index) => return self.select_tab(index),
             Msg::CloseTab(index) => return self.close_tab(index),
             Msg::CloseActive => return self.close_tab(self.active),
-            Msg::NewTab => return self.new_tab(BLANK),
+            Msg::NewTab => return self.new_empty_tab(),
             Msg::StepTab(step) => return self.step_tab(step),
             Msg::Back => self.on_page(Engine::back),
             Msg::Forward => self.on_page(Engine::forward),
@@ -501,10 +743,19 @@ impl App for Browser {
                 self.on_page(Engine::reload);
             }
             Msg::Stop => self.on_page(Engine::stop),
+            Msg::DialogAnswer(accept) => self.answer_dialog(accept),
+            Msg::DialogTyped(text) => self.dialog_typed(text),
+            Msg::Reader(open) => return self.show_reading(open),
+            Msg::Read { tab, result } => self.read(&tab, result),
             Msg::Location(true) => return self.open_location(),
             Msg::Location(false) | Msg::Cancel => {
                 if self.location.is_some() {
                     return self.close_location();
+                }
+                // Reading mode holds the keyboard only while it is shown, so Esc from it puts the
+                // page back rather than reaching the page underneath.
+                if self.reading() {
+                    return self.show_reading(false);
                 }
             }
             Msg::LocationTyped(text) => {
@@ -518,9 +769,66 @@ impl App for Browser {
             Msg::OpenBookmark(url, new_tab) => return self.open_bookmark(&url, new_tab),
             Msg::RemoveBookmark(url) => return self.remove_bookmark(&url),
             Msg::MoreBookmarks(open) => self.more_bookmarks = open,
-            Msg::Suggest(step) => self.step_suggestion(step),
             Msg::OpenSuggestion(row) => return self.open_suggestion(row),
-            Msg::CloseSuggestions => self.close_suggestions(),
+            Msg::ZoomIn => self.move_level(zoom::Move::In),
+            Msg::ZoomOut => self.move_level(zoom::Move::Out),
+            Msg::ZoomReset => self.move_level(zoom::Move::Reset),
+            Msg::ZoomMenu(open) => self.zoom_menu = open,
+            // The settings screen stands in the place of the page, and the page keeps running
+            // under it, so qbrowser's own keys go on working from there.
+            Msg::Settings(open) => return self.open_settings(open),
+            Msg::Help(open) => self.help_open = open,
+            // The framework's rows write their own files, key by key.
+            Msg::Appearance(change) => return self.appearance.update(change, &mut self.settings),
+            Msg::SearchEngine(engine) => return self.set_search_engine(engine),
+            Msg::StartPage(page) => return self.set_start_page(page),
+            // Nothing is written and nothing is applied here: the runtime has already switched
+            // the screen. What the person is doing on the rows stays as it is.
+            Msg::Preferences(preferences) => self.appearance.refresh(preferences),
+            Msg::Saved(row, Err(reason)) => self.not_saved = Some((row, reason)),
+            Msg::Saved(_, Ok(())) => {}
+            Msg::History => {
+                self.history_open = !self.history_open;
+                self.history_at = None;
+                self.steps = history::Steps::default();
+                self.middle = false;
+                // The two screens stand in the same place; the one asked for is the one shown.
+                self.settings_open = false;
+                // The screen's list takes the keyboard while it is on, and the page has it back
+                // after: while the page had it, no key of the list's would ever arrive.
+                return Command::focus(if self.history_open { history::SCREEN } else { view::PAGE });
+            }
+            Msg::CloseHistory => {
+                self.history_open = false;
+                return Command::focus(view::PAGE);
+            }
+            Msg::Steps(which) => {
+                // A middle press that landed on no row must not make the next click a new tab.
+                self.middle = false;
+                self.toggle_steps(which);
+            }
+            Msg::FocusStep(row) => self.focus_step(row),
+            Msg::OpenStep(row) => {
+                let (which, new_tab) = (self.steps.which, std::mem::take(&mut self.middle));
+                return self.open_step(which, row, new_tab);
+            }
+            Msg::MiddleStep => self.middle = true,
+            Msg::FocusVisit(row) => self.history_at = Some(row),
+            Msg::OpenVisit(row) => {
+                let new_tab = std::mem::take(&mut self.middle);
+                return self.open_visit(row, new_tab);
+            }
+            Msg::ForgetVisit(row) => return self.forget_visit(row),
+            Msg::RemoveVisit(at) => return self.remove_visit(at).unwrap_or_else(Command::none),
+            Msg::Copy => return self.copy_selection(),
+            Msg::CopyRaw => return self.copy_selection_raw(),
+            Msg::CopyAddress(address) => return Command::copy(address),
+            Msg::OpenLink(address) => return self.new_tab(&address),
+            Msg::PageRight { column, row } => self.ask_about_link(column, row),
+            Msg::HighlightOption(row) => self.highlight_option(row),
+            Msg::ChooseOption(row) => return self.choose_option(row),
+            Msg::JumpToOption(letter) => self.jump_to_option(letter),
+            Msg::CloseOptions => return self.close_drop_down(),
             Msg::Install => {
                 if let Phase::Missing(Missing { command: Some(command), .. }) = &self.phase {
                     return command.run();
@@ -534,7 +842,10 @@ impl App for Browser {
             Msg::Installed(_) => return self.installed(),
             Msg::Restart => return self.restart(),
             Msg::NewVersion(update) => return Command::toast(update.toast()),
-            Msg::Quit => return Command::batch([self.stop_engine(), Command::quit()]),
+            Msg::Quit => {
+                self.save_session();
+                return Command::batch([self.stop_engine(), Command::quit()]);
+            }
         }
         Command::none()
     }
@@ -543,7 +854,21 @@ impl App for Browser {
         self.screen(ui);
     }
 
+    fn preferences(&self, preferences: &Preferences) -> Option<Msg> {
+        Some(Msg::Preferences(preferences.clone()))
+    }
+
     fn action(&self, name: &str) -> Option<Msg> {
+        // The settings screen is openable while Chromium is missing, failed or gone as well: it is
+        // then the only way to change how qbrowser looks and to stop it asking crates.io about a
+        // newer version on a machine where the browser cannot start at all.
+        // The key overview too: a person whose Chromium is missing still wants to know the keys.
+        match name {
+            "help" => return Some(Msg::Help(true)),
+            "settings" => return Some(Msg::Settings(!self.settings_open)),
+            "cancel" if self.settings_open => return Some(Msg::Settings(false)),
+            _ => {}
+        }
         if self.phase != Phase::Running && self.phase != Phase::Starting {
             return None;
         }
@@ -556,8 +881,15 @@ impl App for Browser {
             "back" => Msg::Back,
             "forward" => Msg::Forward,
             "reload" => Msg::Reload,
+            "cancel" if self.history_open => Msg::CloseHistory,
             "cancel" => Msg::Cancel,
             "bookmark" => Msg::Bookmark,
+            "reader" => Msg::Reader(!self.reading()),
+            "zoom-in" => Msg::ZoomIn,
+            "zoom-out" => Msg::ZoomOut,
+            "zoom-reset" => Msg::ZoomReset,
+            "history" => Msg::History,
+            "copy" => Msg::Copy,
             _ => return None,
         };
         Some(msg)

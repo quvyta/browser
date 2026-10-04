@@ -6,7 +6,7 @@ homepage = "https://quvyta.com/qbrowser/"
 readme = "README.md"
 keywords = ["tui", "terminal", "browser", "web", "chromium"]
 categories = ["command-line-utilities", "web-programming"]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -19,13 +19,14 @@ name = "qbrowser"
 path = "src/lib.rs"
 
 [dependencies]
-quvyta-framework = { version = "0.1.28", features = ["image", "updates"] }
-# Only 127.0.0.1 is ever reached through it, so no TLS.
-tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }
+quvyta-framework = { version = "0.1.32", features = ["image", "updates"] }
 serde_json = "1"
 base64 = "0.22"
-# The same version the framework brings in, so it adds no crate; read for the cell's pixel size.
-crossterm = "0.29.0"
+
+[target.'cfg(unix)'.dependencies]
+# Sending a signal without `unsafe`, which the crate forbids. crossterm and the framework
+# already bring this exact version in, so naming it adds no crate.
+rustix = { version = "1.1", default-features = false, features = ["std", "process"] }
 
 # Every picture of the page passes through the JPEG decoder, and in full-pixel terminals through
 # zlib, on its way to the screen. Unoptimised, as `cargo run` and the tests build them, one frame
@@ -40,6 +41,9 @@ toml = "0.9"
 
 [lints.rust]
 unsafe_code = "forbid"
+# Set by build.rs when the Chromium the tests drive is on this machine; the tests that need it are
+# ignored without it.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(chromium)"] }
 missing_docs = "deny"
 
 [lints.rustdoc]

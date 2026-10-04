@@ -22,6 +22,7 @@ back = "戻る"
 forward = "進む"
 reload = "このページを再読み込み"
 stop = "読み込みを中止"
+reader = "読書モード"
 
 [browser.address]
 label = "アドレス"
@@ -29,16 +30,16 @@ placeholder = "検索するかアドレスを入力"
 
 [browser.profile]
 temporary = "一時プロファイル"
-temporary-explained = "別の qbrowser がプロファイルを使用中のため、このウィンドウは専用のプロファイルを使います。Cookie やログイン情報は閉じると削除されます。"
+temporary-explained = "別の qbrow がプロファイルを使用中のため、このウィンドウは専用のプロファイルを使います。Cookie やログイン情報は閉じると削除されます。"
 
 [browser.chromium]
 missing = "Chromium が見つかりません"
-missing-message = "qbrowser は Chromium でウェブページを描画しますが、このコンピュータにはインストールされていません。"
+missing-message = "qbrow は Chromium でウェブページを描画しますが、このコンピュータにはインストールされていません。"
 install = "ここにインストール"
 show-command = "コマンドを表示"
 command = "このコマンドで Chromium をインストールします:"
 still-missing = "Chromium がまだ見つかりません。別の場所にインストールした場合は、QBROW_CHROMIUM にそのパスを設定してください。"
-unknown-system = "qbrowser はこのシステムでのプログラムのインストール方法を把握していません。お使いのシステムの方法で Chromium か Chrome をインストールするか、QBROW_CHROMIUM にそのパスを設定してから、qbrowser をもう一度起動してください。"
+unknown-system = "qbrow はこのシステムでのプログラムのインストール方法を把握していません。お使いのシステムの方法で Chromium か Chrome をインストールするか、QBROW_CHROMIUM にそのパスを設定してから、qbrow をもう一度起動してください。"
 failed = "Chromium を起動できませんでした"
 stopped = "Chromium が停止しました"
 reason = "最後のメッセージ: {reason}"
@@ -56,7 +57,29 @@ delete = "削除"
 
 [browser.page]
 cannot-show = "この端末では画像を表示できません"
-cannot-show-message = "qbrowser はウェブページを画像として表示します。256色以上に対応した端末で表示でき、kitty グラフィックスプロトコルや sixel に対応した端末では鮮明に表示されます。"
+cannot-show-message = "qbrow はウェブページを画像として表示します。256色以上に対応した端末で表示でき、kitty グラフィックスプロトコルや sixel に対応した端末では鮮明に表示されます。"
+
+[browser.reader]
+open = "読書モードで開く"
+image = "画像"
+nothing = "このページに読むものはありません"
+nothing-message = "本文は数語で、残りはメニューとボタンです。文字のページとして読んでも、ページより多くを伝えられません。"
+back = "ページに戻る"
+failed = "このページは読めませんでした"
+reason = "理由：{reason}"
+
+[browser.help]
+page = "その他のキーはすべてページへ"
+
+[browser.dialog]
+says = "{host} の通知"
+asks = "{host} の確認"
+ok = "OK"
+cancel = "キャンセル"
+leave-title = "このページから移動しますか?"
+leave-message = "ここに入力した内容が保存されない場合があります。"
+leave = "移動する"
+stay = "とどまる"
 
 [browser.cli]
 help = """
@@ -65,12 +88,12 @@ qbrow {version}: ターミナルで動く本物のウェブブラウザ
 使用法: qbrow [ADDRESS]
 
   ADDRESS            ウェブアドレス、このコンピュータ上のファイル、または
-                     DuckDuckGo で検索する語句。指定しない場合、qbrowser は空のタブを開きます。
+                     DuckDuckGo で検索する語句。指定しない場合、qbrow は空のタブを開きます。
   --profile FOLDER   Cookie やログイン情報を通常の場所ではなく FOLDER に保存します
   --version          バージョンを表示します
   --help             このヘルプを表示します
 
-qbrowser は Chromium か Chrome でページを描画します。PATH か QBROW_CHROMIUM から探します。
+qbrow は Chromium か Chrome でページを描画します。PATH か QBROW_CHROMIUM から探します。
 起動時に1日1回、crates.io に新しいバージョンがあるか問い合わせます。設定で無効にできます。"""
 unknown = "qbrow: 不明なオプション {argument} です。qbrow --help を参照してください"
 no-profile-folder = "qbrow: --profile の後にはフォルダーを指定してください"
@@ -86,3 +109,48 @@ forward = "進む"
 reload = "再読み込み"
 cancel = "キャンセル"
 bookmark = "ブックマーク"
+zoom-in = "拡大"
+zoom-out = "縮小"
+zoom-reset = "ズームをリセット"
+settings = "設定"
+history = "履歴"
+copy = "コピー"
+reader = "読書モード"
+
+[browser.zoom]
+level = "ズーム {n}%"
+in = "拡大"
+out = "縮小"
+reset = "リセット"
+forgotten = "倍率は起動のあいだ保持されません。"
+
+# 設定画面: qbrow 独自の行と、検索エンジンの名前。
+[browser.settings]
+title = "設定"
+heading = "ブラウジング"
+search-engine = "検索エンジン"
+search-engine-text = "アドレスではなく単語を入力したとき、アドレスバーが何をするか。"
+start-page = "スタートページ"
+start-page-blank = "空欄: 新しいタブは空白ページを開き、キーボードはアドレスバーに入ります。"
+start-page-opens = "新しいタブは {address} を開きます"
+start-page-searches = "アドレスではなく単語です。新しいタブは {engine} で検索します"
+start-page-placeholder = "アドレスまたは単語"
+
+[browser.search-engine]
+duckduckgo = "DuckDuckGo"
+brave = "Brave"
+mojeek = "Mojeek"
+
+[browser.history]
+title = "履歴"
+empty = "まだ何も開いていません"
+not-saved = "履歴を保存できませんでした"
+today = "今日"
+yesterday = "昨日"
+back-list = "タブが戻る場所"
+forward-list = "タブが行く先"
+delete = "このページを履歴から削除しますか？"
+delete-message = "{page} は履歴からなくなります。"
+
+[browser.menu]
+copy-address = "アドレスをコピー"

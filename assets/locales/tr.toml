@@ -21,6 +21,7 @@ back = "Geri"
 forward = "İleri"
 reload = "Sayfayı yenile"
 stop = "Yüklemeyi durdur"
+reader = "Okuma kipi"
 
 [browser.address]
 label = "Adres"
@@ -28,16 +29,16 @@ placeholder = "Ara ya da bir adres yaz"
 
 [browser.profile]
 temporary = "geçici profil"
-temporary-explained = "Profilini başka bir qbrowser kullanıyor, bu yüzden bu pencere kendine ayrı bir profil açtı. Çerezleri ve oturumları pencere kapanınca silinir."
+temporary-explained = "Profilini başka bir qbrow kullanıyor, bu yüzden bu pencere kendine ayrı bir profil açtı. Çerezleri ve oturumları pencere kapanınca silinir."
 
 [browser.chromium]
 missing = "Chromium bulunamadı"
-missing-message = "qbrowser web sayfalarını Chromium ile çizer, o da bu bilgisayarda kurulu değil."
+missing-message = "qbrow web sayfalarını Chromium ile çizer, o da bu bilgisayarda kurulu değil."
 install = "Burada kur"
 show-command = "Komutu göster"
 command = "Chromium'u şu komut kurar:"
 still-missing = "Chromium hâlâ bulunamadı. Başka bir yere kurulduysa QBROW_CHROMIUM değişkenine yolunu yaz."
-unknown-system = "qbrowser bu sistemin program kurma yolunu tanımıyor. Chromium'u ya da Chrome'u sistemin kendi yoluyla kur ya da QBROW_CHROMIUM değişkenine birinin yolunu yaz, sonra qbrowser'ı yeniden aç."
+unknown-system = "qbrow bu sistemin program kurma yolunu tanımıyor. Chromium'u ya da Chrome'u sistemin kendi yoluyla kur ya da QBROW_CHROMIUM değişkenine birinin yolunu yaz, sonra qbrow'u yeniden aç."
 failed = "Chromium başlayamadı"
 stopped = "Chromium durdu"
 reason = "Son sözü: {reason}"
@@ -55,7 +56,29 @@ delete = "Kaldır"
 
 [browser.page]
 cannot-show = "Bu terminal resim gösteremiyor"
-cannot-show-message = "qbrowser web sayfalarını resim olarak gösterir. 256 ya da daha çok renkli bir terminal onları gösterir; kitty grafik protokolünü ya da sixel'i konuşan bir terminal keskin gösterir."
+cannot-show-message = "qbrow web sayfalarını resim olarak gösterir. 256 ya da daha çok renkli bir terminal onları gösterir; kitty grafik protokolünü ya da sixel'i konuşan bir terminal keskin gösterir."
+
+[browser.reader]
+open = "Okuma kipinde aç"
+image = "resim"
+nothing = "Bu sayfada okunacak bir metin yok"
+nothing-message = "Asıl metni birkaç sözcükten oluşuyor, gerisi menüler ve düğmeler. Sayfayı bir yazı sayfası olarak okumak, sayfanın kendisinden azını söyler."
+back = "Sayfaya dön"
+failed = "Bu sayfa okunamadı"
+reason = "Şunu söyledi: {reason}"
+
+[browser.help]
+page = "öbür her tuş sayfaya gider"
+
+[browser.dialog]
+says = "{host} diyor ki"
+asks = "{host} soruyor"
+ok = "Tamam"
+cancel = "Vazgeç"
+leave-title = "Bu sayfadan çıkılsın mı?"
+leave-message = "Sayfaya yazdıklarınız kaybolabilir."
+leave = "Çık"
+stay = "Kal"
 
 [browser.cli]
 help = """
@@ -64,13 +87,13 @@ qbrow {version}: terminalde gerçek bir web tarayıcısı
 Kullanım: qbrow [ADRES]
 
   ADRES              bir web adresi, bu bilgisayardaki bir dosya ya da DuckDuckGo'da
-                     aranacak sözcükler. Verilmezse qbrowser boş bir sekme açar.
+                     aranacak sözcükler. Verilmezse qbrow boş bir sekme açar.
   --profile KLASÖR   çerezleri ve oturumları her zamanki yer yerine KLASÖR'de tutar
   --version          sürümü yazar
   --help             bu yardımı yazar
 
-qbrowser sayfaları Chromium ya da Chrome ile çizer; onu PATH'te ya da QBROW_CHROMIUM'da arar.
-qbrowser açılışta günde en fazla bir kez crates.io'ya yeni bir sürüm olup olmadığını sorar; ayarlardan kapatılabilir."""
+qbrow sayfaları Chromium ya da Chrome ile çizer; onu PATH'te ya da QBROW_CHROMIUM'da arar.
+qbrow açılışta günde en fazla bir kez crates.io'ya yeni bir sürüm olup olmadığını sorar; ayarlardan kapatılabilir."""
 unknown = "qbrow: bilinmeyen seçenek {argument}; qbrow --help yazıp bakabilirsin"
 no-profile-folder = "qbrow: --profile arkasından bir klasör ister"
 
@@ -85,3 +108,48 @@ forward = "ileri"
 reload = "yenile"
 cancel = "vazgeç"
 bookmark = "yer imi"
+zoom-in = "yakınlaştır"
+zoom-out = "uzaklaştır"
+zoom-reset = "yakınlaştırmayı sıfırla"
+settings = "ayarlar"
+history = "geçmiş"
+copy = "kopyala"
+reader = "okuma kipi"
+
+[browser.zoom]
+level = "Yakınlaştırma {n}%"
+in = "Büyüt"
+out = "Küçült"
+reset = "Sıfırla"
+forgotten = "Düzey başlangıçlar arasında hatırlanmaz."
+
+# Ayarlar ekranı: qbrow'un kendi satırları ve sunduğu arama motorlarının adları.
+[browser.settings]
+title = "Ayarlar"
+heading = "Gezinme"
+search-engine = "Arama motoru"
+search-engine-text = "Adres yerine yazılan sözcüklerin adres çubuğunun gittiği yer."
+start-page = "Başlangıç sayfası"
+start-page-blank = "Boş: yeni sekme boş bir sayfa açar, yazmak için adres çubuğuna geçer."
+start-page-opens = "Yeni sekme şunu açar: {address}"
+start-page-searches = "Bunlar adres değil: yeni sekme onları {engine} ile arar."
+start-page-placeholder = "bir adres ya da sözcükler"
+
+[browser.search-engine]
+duckduckgo = "DuckDuckGo"
+brave = "Brave"
+mojeek = "Mojeek"
+
+[browser.history]
+title = "Geçmiş"
+empty = "Henüz hiçbir sayfa açılmadı"
+not-saved = "Geçmiş kaydedilemedi"
+today = "Bugün"
+yesterday = "Dün"
+back-list = "Sekmenin geçtiği sayfalar"
+forward-list = "Sekmenin gidebileceği sayfalar"
+delete = "Bu sayfa geçmişten çıkarılsın mı?"
+delete-message = "{page} artık geçmişte olmayacak."
+
+[browser.menu]
+copy-address = "Adresi kopyala"

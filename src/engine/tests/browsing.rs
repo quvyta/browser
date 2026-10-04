@@ -6,6 +6,7 @@ use super::fixture::{Browser, Scratch, Slot, jpeg_size, page, processes_mentioni
 use crate::engine::{Event, KeyPress, Modifiers, Mouse, procfs};
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_shown_tab_sends_frames_the_size_of_its_viewport() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -21,6 +22,31 @@ fn a_shown_tab_sends_frames_the_size_of_its_viewport() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
+fn a_picture_limit_shrinks_the_frames_but_not_the_page_and_can_be_lifted() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let browser = Browser::start(&scratch.options());
+    let tab = browser.open(&page("/long"));
+    browser.engine.set_viewport(&tab, 640, 400);
+    let frame = |wanted: (u32, u32)| {
+        browser.wait(&format!("a {wanted:?} frame"), |event| match event {
+            Event::Frame { tab: from, jpeg } if *from == tab => jpeg_size(jpeg).filter(|size| *size == wanted),
+            _ => None,
+        })
+    };
+    frame((640, 400));
+    // Two pixels a cell of a page area 64 cells wide and 20 high: the shape is kept, so the
+    // narrower bound decides.
+    browser.engine.set_picture_limit(Some((64, 40)));
+    assert_eq!(frame((64, 40)), (64, 40));
+    assert_eq!(browser.eval(&tab, "[innerWidth, innerHeight]"), json!([640, 400]), "the page is laid out as before");
+    browser.engine.set_picture_limit(None);
+    assert_eq!(frame((640, 400)), (640, 400));
+}
+
+#[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn clicking_a_link_where_it_is_drawn_follows_it() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -34,6 +60,7 @@ fn clicking_a_link_where_it_is_drawn_follows_it() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn keys_pressed_after_clicking_a_field_land_in_it() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -66,6 +93,7 @@ fn keys_pressed_after_clicking_a_field_land_in_it() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn the_wheel_scrolls_the_page_down() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -77,6 +105,7 @@ fn the_wheel_scrolls_the_page_down() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_target_blank_link_opens_a_tab_with_its_opener() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -93,6 +122,7 @@ fn a_target_blank_link_opens_a_tab_with_its_opener() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_window_the_page_opens_is_a_tab_and_closing_itself_closes_it() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -111,6 +141,7 @@ fn a_window_the_page_opens_is_a_tab_and_closing_itself_closes_it() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn back_and_forward_walk_the_history_and_say_where_they_can_go() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -130,6 +161,7 @@ fn back_and_forward_walk_the_history_and_say_where_they_can_go() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn loading_titles_and_closing_are_reported() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -139,7 +171,9 @@ fn loading_titles_and_closing_are_reported() {
     // Everything the tab says until the script has changed the title, in order.
     let mut heard = Vec::new();
     browser.wait("the changed title", |event| match event {
-        Event::Title { tab: from, title } if *from == tab => {
+        // The first page's own title can come late on a loaded machine, after the next page
+        // began loading; it is that page's, not a title of the page being read.
+        Event::Title { tab: from, title } if *from == tab && title != "Links" => {
             heard.push(title.clone());
             (title == "After").then_some(())
         }
@@ -160,6 +194,7 @@ fn loading_titles_and_closing_are_reported() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_crashed_tab_is_reported_and_comes_back_when_loaded_again() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -180,4 +215,24 @@ fn a_crashed_tab_is_reported_and_comes_back_when_loaded_again() {
     browser.engine.navigate(&tab, &page("/third"));
     browser.arrive(&tab, &page("/third"));
     assert_eq!(browser.eval(&tab, "document.title"), "Third");
+}
+
+#[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
+fn a_test_chromium_never_reaches_a_real_site() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let browser = Browser::start(&scratch.options());
+    // An address on the internet, written as a number so no name lookup stands in the way: the
+    // tests' proxy refuses it on this machine, and the page says so.
+    // Where an error page leaves the tab's history varies, so what is waited for is the page
+    // itself rather than an arrival at the address.
+    browser.engine.open_tab("http://1.1.1.1/");
+    let tab = browser.wait("the new tab", |event| match event {
+        Event::TabOpened { tab, opener: None, .. } => Some(tab.clone()),
+        _ => None,
+    });
+    browser.until(&tab, "!!document.body && document.body.innerText.includes('ERR_PROXY_CONNECTION_FAILED')");
+    let local = browser.open(&page("/second"));
+    assert_eq!(browser.eval(&local, "document.title"), "Second", "the local test server is reached all the same");
 }

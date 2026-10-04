@@ -11,8 +11,8 @@ use qframe::runtime::Termination;
 
 use super::{Scratch, Slot, find_in_row, open, open_on, page, page_drawn, until, until_page};
 use crate::app::{Browser, Msg};
-use crate::engine::Event;
 use crate::engine::tests::fixture::{processes_mentioning, wait_until_none_mention};
+use crate::engine::{Event, kill_group, kill_process};
 
 /// Lets the screen settle where no Chromium runs: the start is answered at once.
 fn settle(h: &mut Harness<Browser>) {
@@ -64,6 +64,7 @@ fn on_a_system_qbrowser_cannot_install_on_it_explains_the_way_by_hand() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn chromium_found_after_the_install_is_started() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -79,19 +80,21 @@ fn chromium_found_after_the_install_is_started() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn chromium_ending_on_its_own_is_said_and_restarting_brings_the_tabs_back() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
     let links = page("/links");
     let mut h = open(&scratch, &links);
     let group = h.app().engine().map(crate::engine::Engine::chromium_pid).expect("Chromium runs");
-    kill(&format!("-{group}"));
+    kill_group(group);
     until(&mut h, "the stopped screen", |h| h.screen().contains("Chromium stopped"));
     h.click_text("Restart");
     until(&mut h, "the page again", |h| h.app().address() == links && page_drawn(h));
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_crashed_tab_says_so_and_reload_brings_it_back() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -102,7 +105,7 @@ fn a_crashed_tab_says_so_and_reload_brings_it_back() {
     for pid in processes_mentioning(&profile) {
         let arguments = std::fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
         if String::from_utf8_lossy(&arguments).contains("--type=renderer") {
-            kill(&pid.to_string());
+            kill_process(pid);
         }
     }
     until(&mut h, "the crashed tab", |h| h.screen().contains("This tab crashed"));
@@ -115,28 +118,30 @@ fn a_crashed_tab_says_so_and_reload_brings_it_back() {
     until_page(&mut h, "document.title === 'Links'");
 }
 
-/// Sends SIGKILL to `target`: a process id, or a process group as `-<id>`.
-fn kill(target: &str) {
-    let status = std::process::Command::new("kill").args(["-KILL", "--", target]).status().expect("kill runs");
-    assert!(status.success(), "kill {target}");
-}
-
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_second_qbrowser_on_the_same_profile_runs_on_a_temporary_one_and_says_so() {
-    let _first_slot = Slot::take();
+    let _slots = Slot::take_many(2);
     let scratch = Scratch::new();
     let first = open(&scratch, &page("/links"));
     assert!(!first.screen().contains("temporary profile"), "{}", first.screen());
-    let _second_slot = Slot::take();
     let mut second = open(&scratch, &page("/second"));
     until(&mut second, "the temporary profile label", |h| find_in_row(h, "temporary profile", 1).is_some());
     let (x, y) = find_in_row(&second, "temporary profile", 1).unwrap();
     second.hover(x + 2, y).advance(Duration::from_secs(1));
-    assert!(second.screen().contains("Another qbrowser is using your profile"), "{}", second.screen());
-    drop(first);
+    assert!(second.screen().contains("Another qbrow is using your profile"), "{}", second.screen());
+    // The second window's tabs are not kept: its quitting leaves the first window's list alone.
+    second.press("ctrl+q");
+    assert!(second.quit_requested());
+    assert!(!scratch.path("home/session").exists(), "the window on a temporary profile wrote the tabs to keep");
+    let mut first = first;
+    first.press("ctrl+q");
+    let kept = std::fs::read_to_string(scratch.path("home/session")).unwrap_or_default();
+    assert_eq!(kept, format!("*{}\n", page("/links")), "the first window's tabs are kept");
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn quitting_ends_every_chromium_process() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -152,6 +157,7 @@ fn quitting_ends_every_chromium_process() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn what_chromium_says_while_it_is_ended_leaves_the_last_screen_as_it_was() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -165,6 +171,7 @@ fn what_chromium_says_while_it_is_ended_leaves_the_last_screen_as_it_was() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_hangup_ends_chromium_too() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -189,6 +196,7 @@ fn a_terminal_too_small_says_so() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_terminal_without_pictures_says_why_the_page_is_not_drawn() {
     let _slot = Slot::take();
     let scratch = Scratch::new();

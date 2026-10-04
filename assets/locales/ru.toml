@@ -22,6 +22,7 @@ back = "Назад"
 forward = "Вперёд"
 reload = "Перезагрузить эту страницу"
 stop = "Остановить загрузку"
+reader = "Режим чтения"
 
 [browser.address]
 label = "Адрес"
@@ -29,16 +30,16 @@ placeholder = "Поиск или адрес"
 
 [browser.profile]
 temporary = "временный профиль"
-temporary-explained = "Ваш профиль использует другой qbrowser, поэтому у этого окна есть собственный профиль. Его cookie и входы удаляются при закрытии."
+temporary-explained = "Ваш профиль использует другой qbrow, поэтому у этого окна есть собственный профиль. Его cookie и входы удаляются при закрытии."
 
 [browser.chromium]
 missing = "Chromium не найден"
-missing-message = "qbrowser рисует веб-страницы с помощью Chromium, который не установлен на этом компьютере."
+missing-message = "qbrow рисует веб-страницы с помощью Chromium, который не установлен на этом компьютере."
 install = "Установить здесь"
 show-command = "Показать команду"
 command = "Эта команда устанавливает Chromium:"
 still-missing = "Chromium всё ещё не найден. Если он установлен в другом месте, укажите путь к нему в QBROW_CHROMIUM."
-unknown-system = "qbrowser не знает, как в этой системе устанавливаются программы. Установите Chromium или Chrome обычным для этой системы способом либо укажите путь к одному из них в QBROW_CHROMIUM, затем запустите qbrowser снова."
+unknown-system = "qbrow не знает, как в этой системе устанавливаются программы. Установите Chromium или Chrome обычным для этой системы способом либо укажите путь к одному из них в QBROW_CHROMIUM, затем запустите qbrow снова."
 failed = "Не удалось запустить Chromium"
 stopped = "Chromium остановлен"
 reason = "Последнее сообщение: {reason}"
@@ -56,7 +57,29 @@ delete = "Удалить"
 
 [browser.page]
 cannot-show = "Этот терминал не показывает изображения"
-cannot-show-message = "qbrowser показывает веб-страницы как изображения. Их покажет терминал с 256 цветами или больше, а терминал с протоколом kitty graphics или sixel покажет их чётко."
+cannot-show-message = "qbrow показывает веб-страницы как изображения. Их покажет терминал с 256 цветами или больше, а терминал с протоколом kitty graphics или sixel покажет их чётко."
+
+[browser.reader]
+open = "Открыть в режиме чтения"
+image = "изображение"
+nothing = "На этой странице нечего читать"
+nothing-message = "Основной текст — несколько слов, а остальное — меню и кнопки. Читать его как страницу текста значило бы сказать меньше, чем сама страница."
+back = "Вернуться к странице"
+failed = "Эту страницу прочитать не удалось"
+reason = "Она сказала: {reason}"
+
+[browser.help]
+page = "все остальные клавиши идут странице"
+
+[browser.dialog]
+says = "{host} сообщает"
+asks = "{host} спрашивает"
+ok = "ОК"
+cancel = "Отмена"
+leave-title = "Покинуть эту страницу?"
+leave-message = "Введённое вами на этой странице может не сохраниться."
+leave = "Покинуть"
+stay = "Остаться"
 
 [browser.cli]
 help = """
@@ -65,13 +88,13 @@ qbrow {version}: настоящий веб-браузер в терминале
 Использование: qbrow [АДРЕС]
 
   АДРЕС              веб-адрес, файл на этом компьютере или слова для поиска через
-                     DuckDuckGo. Без него qbrowser открывает пустую вкладку.
+                     DuckDuckGo. Без него qbrow открывает пустую вкладку.
   --profile ПАПКА    хранить cookie и входы в ПАПКЕ, а не в обычном месте
   --version          показать версию
   --help             показать эту справку
 
-qbrowser рисует страницы с помощью Chromium или Chrome, найденных в PATH или в QBROW_CHROMIUM.
-Раз в день при запуске qbrowser спрашивает crates.io, не вышла ли новая версия; отключите это в настройках."""
+qbrow рисует страницы с помощью Chromium или Chrome, найденных в PATH или в QBROW_CHROMIUM.
+Раз в день при запуске qbrow спрашивает crates.io, не вышла ли новая версия; отключите это в настройках."""
 unknown = "qbrow: неизвестный параметр {argument}; см. qbrow --help"
 no-profile-folder = "qbrow: после --profile требуется указать папку"
 
@@ -86,3 +109,48 @@ forward = "вперёд"
 reload = "обновить"
 cancel = "отмена"
 bookmark = "закладка"
+zoom-in = "увеличить"
+zoom-out = "уменьшить"
+zoom-reset = "сбросить масштаб"
+settings = "настройки"
+history = "история"
+copy = "копировать"
+reader = "режим чтения"
+
+[browser.zoom]
+level = "Масштаб {n}%"
+in = "Увеличить"
+out = "Уменьшить"
+reset = "Сбросить"
+forgotten = "Масштаб не сохраняется между запусками."
+
+# Экран настроек: собственные строки qbrow и названия предлагаемых им поисковиков.
+[browser.settings]
+title = "Настройки"
+heading = "Просмотр"
+search-engine = "Поисковик"
+search-engine-text = "Что адресная строка делает со словами, набранными вместо адреса."
+start-page = "Домашняя страница"
+start-page-blank = "Пусто: новая вкладка открывает пустую страницу, клавиатура в адресной строке."
+start-page-opens = "Новая вкладка откроет {address}"
+start-page-searches = "Это слова, а не адрес: новая вкладка ищет их через {engine}"
+start-page-placeholder = "адрес или слова"
+
+[browser.search-engine]
+duckduckgo = "DuckDuckGo"
+brave = "Brave"
+mojeek = "Mojeek"
+
+[browser.history]
+title = "История"
+empty = "Пока ничего не открыто"
+not-saved = "Не удалось сохранить историю"
+today = "Сегодня"
+yesterday = "Вчера"
+back-list = "Где была вкладка"
+forward-list = "Куда может перейти вкладка"
+delete = "Убрать эту страницу из истории?"
+delete-message = "{page} больше не будет в истории."
+
+[browser.menu]
+copy-address = "Копировать адрес"

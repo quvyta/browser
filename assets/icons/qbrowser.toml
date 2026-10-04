@@ -5,9 +5,18 @@
 name = "qbrowser"
 
 [icons]
-# nf-md-refresh
-"browser.reload" = { nerd = "\U000F0450", unicode = "⟳", ascii = "R" }
 # nf-md-star_outline: the page is not a bookmark
-"browser.star" = { nerd = "\U000F04D2", unicode = "☆", ascii = "+" }
+"browser.star" = { nerd = "\U000F04D2", unicode = "☆", ascii = "o" }
 # nf-md-star: the page is a bookmark
-"browser.starred" = { nerd = "\U000F04CE", unicode = "★", ascii = "*" }
+"browser.starred" = { nerd = "\U000F04CE", unicode = "★", ascii = "@" }
+# nf-md-file_document_outline: the reading button, the page's own text as a document of lines. The
+# Unicode and ASCII glyphs are lines of text too, and no toolbar button wears them.
+"browser.reader" = { nerd = "\U000F09EE", unicode = "≡", ascii = "=" }
+# The lens on the toolbar's zoom button, and the two marks that say the level has moved. The nerd
+# glyphs are the plain characters too: a Nerd Font carries them, and a codepoint guessed from a
+# name would draw nothing.
+"browser.zoom" = { nerd = "⌕", unicode = "⌕", ascii = "/" }
+# A sign inside a ring: the page is drawn larger than the area it is drawn in.
+"browser.zoom.larger" = { nerd = "⊕", unicode = "⊕", ascii = "+" }
+# The same ring the other way: the page is drawn smaller than the area.
+"browser.zoom.smaller" = { nerd = "⊖", unicode = "⊖", ascii = "-" }

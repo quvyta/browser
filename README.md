@@ -18,6 +18,8 @@ qbrow needs Chromium (or Google Chrome). It looks for `QBROW_CHROMIUM`, then `ch
 
 Where the terminal speaks the kitty graphics protocol or sixel (kitty, WezTerm, Ghostty, Konsole, foot and others), the page is drawn in real pixels. Everywhere else, over SSH and inside tmux too, every cell shows two pixels with half blocks: the page's layout and pictures are there, small text is not readable. `QUVYTA_GRAPHICS=halfblock` chooses half blocks anywhere.
 
+Reading mode (F9, or the button beside the star) puts the page's own text where its picture is, written with the terminal's own letters: headings, paragraphs, lists, quotes, code and tables, without the menus, sidebars and footers around them. It reads at any font size and on a terminal that draws no picture at all, where the empty page has a button for it. F9, the button or Esc puts the page back; a tab keeps its reading until it goes to another address. Links are not followed from the reading.
+
 ## Keys
 
 | | Keys | Mouse |
@@ -30,9 +32,16 @@ Where the terminal speaks the kitty graphics protocol or sixel (kitty, WezTerm, 
 | Next, previous tab | ctrl+PgDn, ctrl+PgUp | click the tab |
 | Bookmark the page, or remove it | ctrl+d | the star |
 | Open a bookmark | type part of its name or address, ↓ ↑, enter | click it on the bar; middle click opens it in a new tab |
+| Open a page's drop-down list | Tab to it, then alt+↓, F4 or space; ↑ ↓ or a letter, enter | click it, then click an option |
+| Copy what is selected on the page | ctrl+c | right click → Copy, or Copy raw to keep its lines |
+| The pages seen before | ctrl+h | the small arrow beside back or forward lists the tab's own steps |
+| Zoom in, out, back to 100% | ctrl++ (or ctrl+=), ctrl+-, ctrl+0 | the zoom button's list |
+| Reading mode, and back to the page | F9; Esc closes it | the button beside the star |
+| Settings | ctrl+, | the gear |
+| Every key, listed | F1; `?` where the page does not have the keyboard | |
 | Quit | ctrl+q | |
 
-While the page has the keyboard (after a click on it), every other key goes to the page: Tab moves between its fields, the arrows and PgUp/PgDn scroll it, and pasting pastes into it. Closing the last tab opens an empty one; qbrow ends only with ctrl+q.
+While the page has the keyboard (after a click on it), every other key goes to the page: Tab moves between its fields, the arrows and PgUp/PgDn scroll it, and pasting pastes into it. Closing the last tab opens an empty one; qbrow ends only with ctrl+q, and the tabs open then come back at the next start. A page's own alert, confirm and prompt boxes show over its tab and wait for your answer; Enter is OK and Esc is Cancel.
 
 ## Bookmarks
 
@@ -40,13 +49,17 @@ The star at the end of the address bar keeps the page as a bookmark, and a secon
 
 The bookmarks are kept in `~/.local/share/quvyta/browser/bookmarks`, one per line: the address, a tab, and the name.
 
+## History
+
+The small arrow beside back and beside forward lists the tab's own steps to that side; choosing one goes there, a middle click opens it in a new tab. ctrl+h shows the pages this profile has seen, newest first and grouped by day: enter opens one, a middle click opens it in a new tab, and Delete takes it out after asking. A page seen again is one entry at its newest time, and the newest 5000 are kept. The list is kept beside the browser profile in `~/.local/state/quvyta/browser/history`, never sent anywhere; a window that runs on a temporary profile keeps its own and takes it away when it closes.
+
 ## Profile
 
 Cookies and logins are kept in `~/.local/state/quvyta/browser/profile`, apart from any Chromium profile of your own. A second qbrow started while the first runs uses a temporary profile, says so on its toolbar and removes it when it quits. Every Chromium process a qbrow starts ends with it.
 
 ## Network
 
-qbrow is a web browser: it reaches every site you open, and Chromium makes its own usual requests besides. Apart from that, once a day at start qbrow asks crates.io whether a newer version of `quvyta-browser` is out and says so in a notice when there is one; only the package's name and version are sent. The question never holds up the start and is silent without a network. The switch that turns it off is shared by every Quvyta application and is on their settings pages.
+qbrow is a web browser: it reaches every site you open, and Chromium makes its own usual requests besides. Apart from that, once a day at start qbrow asks crates.io whether a newer version of `quvyta-browser` is out and says so in a notice when there is one; only the package's name and version are sent. The question never holds up the start and is silent without a network. The switch that turns it off is shared by every Quvyta application and is on their settings pages, qbrow's included (ctrl+, or the gear). qbrow talks to its Chromium over a pair of pipes, not a network port, so no other program or user on the computer can connect to it.
 
 ## Licence
 

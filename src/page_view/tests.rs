@@ -175,6 +175,20 @@ fn a_second_press_on_the_same_cell_soon_after_is_a_double_click() {
 }
 
 #[test]
+fn a_third_press_is_a_triple_click_and_a_fourth_starts_over() {
+    let mut screen = screen();
+    for _ in 0..4 {
+        screen.click(LEFT + 2, TOP + 2);
+    }
+    let presses: Vec<_> = screen.app().mouse().iter().step_by(2).map(|(mouse, ..)| *mouse).collect();
+    assert_eq!(
+        presses,
+        [1, 2, 3, 1].map(|clicks| Mouse::Pressed { button: Button::Left, clicks }),
+        "a desktop browser knows no fourth kind of click"
+    );
+}
+
+#[test]
 fn other_buttons_drags_moves_and_the_wheel_reach_the_page() {
     let mut screen = screen();
     screen.mouse(MouseKind::Down(MouseButton::Right), LEFT + 1, TOP + 1);

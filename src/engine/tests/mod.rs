@@ -3,4 +3,6 @@
 
 mod browsing;
 pub(crate) mod fixture;
+mod helpers;
 mod lifecycle;
+mod selection;

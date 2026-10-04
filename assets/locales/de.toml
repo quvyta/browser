@@ -22,6 +22,7 @@ back = "Zurück"
 forward = "Vorwärts"
 reload = "Diese Seite neu laden"
 stop = "Laden abbrechen"
+reader = "Leseansicht"
 
 [browser.address]
 label = "Adresse"
@@ -29,16 +30,16 @@ placeholder = "Suchen oder Adresse eingeben"
 
 [browser.profile]
 temporary = "temporäres Profil"
-temporary-explained = "Ein anderes qbrowser verwendet dein Profil, daher hat dieses Fenster ein eigenes. Seine Cookies und Anmeldungen werden beim Schließen gelöscht."
+temporary-explained = "Ein anderes qbrow verwendet dein Profil, daher hat dieses Fenster ein eigenes. Seine Cookies und Anmeldungen werden beim Schließen gelöscht."
 
 [browser.chromium]
 missing = "Chromium wurde nicht gefunden"
-missing-message = "qbrowser stellt Webseiten mit Chromium dar, das auf diesem Computer nicht installiert ist."
+missing-message = "qbrow stellt Webseiten mit Chromium dar, das auf diesem Computer nicht installiert ist."
 install = "Hier installieren"
 show-command = "Befehl anzeigen"
 command = "Dieser Befehl installiert Chromium:"
 still-missing = "Chromium wurde weiterhin nicht gefunden. Falls es woanders installiert wurde, setze QBROW_CHROMIUM auf seinen Pfad."
-unknown-system = "qbrowser weiß nicht, wie dieses System Programme installiert. Installiere Chromium oder Chrome so, wie es dein System vorsieht, oder setze QBROW_CHROMIUM auf den Pfad zu einem davon und starte qbrowser dann neu."
+unknown-system = "qbrow weiß nicht, wie dieses System Programme installiert. Installiere Chromium oder Chrome so, wie es dein System vorsieht, oder setze QBROW_CHROMIUM auf den Pfad zu einem davon und starte qbrow dann neu."
 failed = "Chromium konnte nicht gestartet werden"
 stopped = "Chromium wurde beendet"
 reason = "Zuletzt meldete es: {reason}"
@@ -56,7 +57,29 @@ delete = "Entfernen"
 
 [browser.page]
 cannot-show = "Dieses Terminal kann keine Bilder anzeigen"
-cannot-show-message = "qbrowser zeigt Webseiten als Bilder an. Ein Terminal mit 256 Farben oder mehr zeigt sie, und eines, das das kitty-Grafikprotokoll oder Sixel beherrscht, zeigt sie gestochen scharf."
+cannot-show-message = "qbrow zeigt Webseiten als Bilder an. Ein Terminal mit 256 Farben oder mehr zeigt sie, und eines, das das kitty-Grafikprotokoll oder Sixel beherrscht, zeigt sie gestochen scharf."
+
+[browser.reader]
+open = "In der Leseansicht öffnen"
+image = "Bild"
+nothing = "Auf dieser Seite gibt es nichts zu lesen"
+nothing-message = "Ihr Haupttext ist ein paar Wörter lang, der Rest sind Menüs und Schaltflächen. Ihn als Fließtext zu lesen würde weniger sagen als die Seite selbst."
+back = "Zurück zur Seite"
+failed = "Diese Seite konnte nicht gelesen werden"
+reason = "Sie sagte: {reason}"
+
+[browser.help]
+page = "jede andere Taste geht an die Seite"
+
+[browser.dialog]
+says = "{host} sagt"
+asks = "{host} fragt"
+ok = "OK"
+cancel = "Abbrechen"
+leave-title = "Diese Seite verlassen?"
+leave-message = "Was du hier eingegeben hast, wird vielleicht nicht gespeichert."
+leave = "Verlassen"
+stay = "Bleiben"
 
 [browser.cli]
 help = """
@@ -65,13 +88,13 @@ qbrow {version}: ein echter Webbrowser im Terminal
 Aufruf: qbrow [ADRESSE]
 
   ADRESSE            eine Webadresse, eine Datei auf diesem Computer oder Suchbegriffe für
-                     DuckDuckGo. Ohne Angabe öffnet qbrowser einen leeren Tab.
+                     DuckDuckGo. Ohne Angabe öffnet qbrow einen leeren Tab.
   --profile ORDNER   Cookies und Anmeldungen in ORDNER statt am üblichen Ort speichern
   --version          die Version ausgeben
   --help             diese Hilfe ausgeben
 
-qbrowser stellt Seiten mit Chromium oder Chrome dar, gefunden in PATH oder unter QBROW_CHROMIUM.
-Einmal täglich fragt qbrowser beim Start crates.io nach einer neueren Version; abschaltbar in den Einstellungen."""
+qbrow stellt Seiten mit Chromium oder Chrome dar, gefunden in PATH oder unter QBROW_CHROMIUM.
+Einmal täglich fragt qbrow beim Start crates.io nach einer neueren Version; abschaltbar in den Einstellungen."""
 unknown = "qbrow: unbekannte Option {argument}; siehe qbrow --help"
 no-profile-folder = "qbrow: hinter --profile muss ein Ordner stehen"
 
@@ -86,3 +109,48 @@ forward = "vorwärts"
 reload = "neu laden"
 cancel = "abbrechen"
 bookmark = "Lesezeichen"
+zoom-in = "vergrößern"
+zoom-out = "verkleinern"
+zoom-reset = "Zoom zurücksetzen"
+settings = "Einstellungen"
+history = "Verlauf"
+copy = "kopieren"
+reader = "Leseansicht"
+
+[browser.zoom]
+level = "Zoom {n}%"
+in = "Vergrößern"
+out = "Verkleinern"
+reset = "Zurücksetzen"
+forgotten = "Der Zoomgrad wird zwischen zwei Starts nicht gemerkt."
+
+# Die Einstellungsseite: die eigenen Zeilen von qbrow und die Namen der angebotenen Suchmaschinen.
+[browser.settings]
+title = "Einstellungen"
+heading = "Surfen"
+search-engine = "Suchmaschine"
+search-engine-text = "Was die Adressleiste mit Wörtern macht, die statt einer Adresse getippt wurden."
+start-page = "Startseite"
+start-page-blank = "Leer: ein neuer Tab öffnet eine leere Seite, die Tastatur in der Adressleiste."
+start-page-opens = "Ein neuer Tab öffnet {address}"
+start-page-searches = "Wörter, keine Adresse: ein neuer Tab sucht sie mit {engine}"
+start-page-placeholder = "eine Adresse oder Wörter"
+
+[browser.search-engine]
+duckduckgo = "DuckDuckGo"
+brave = "Brave"
+mojeek = "Mojeek"
+
+[browser.history]
+title = "Verlauf"
+empty = "Es wurde noch nichts besucht"
+not-saved = "Der Verlauf konnte nicht gespeichert werden"
+today = "Heute"
+yesterday = "Gestern"
+back-list = "Wo der Tab gewesen ist"
+forward-list = "Wohin der Tab gehen kann"
+delete = "Diese Seite aus dem Verlauf nehmen?"
+delete-message = "{page} steht dann nicht mehr im Verlauf."
+
+[browser.menu]
+copy-address = "Adresse kopieren"

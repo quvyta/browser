@@ -1,5 +1,6 @@
 //! Between the engine and the screen: starting Chromium off the drawing thread, the task that
-//! carries its events to the screen, and the size of the page in pixels.
+//! carries its events to the screen and says when a cell's pixel size changed, and the size of
+//! the page in pixels.
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -7,18 +8,16 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use qframe::geometry::Size;
-use qframe::runtime::{Command, Task, TaskCx, TaskId};
+use qframe::runtime::{Command, RecvWait, Task, TaskCx, TaskId};
 use qframe::widgets::ImageData;
 
 use super::{Machine, Msg};
 use crate::engine::{Engine, Event, Options, StartError, TabId};
 
-/// How often the event task looks for what Chromium sent: once a frame at sixty frames a second,
-/// the most the screen draws.
-///
-/// A framework task can only wait by sleeping, and a sleep is what its cancel wakes; blocking on
-/// the engine's channel would keep a cancelled task alive until Chromium spoke again.
-const PACE: Duration = Duration::from_millis(16);
+/// How long the event task waits for Chromium before it looks again whether the cell's pixel size
+/// changed. What Chromium sends wakes it at once; only that look needs the clock (see
+/// [`SeenCell`]), and a font size change seen a twentieth of a second late is not noticed.
+const CELL_LOOK: Duration = Duration::from_millis(50);
 
 /// The largest picture decoded, far past any screen, so a frame is never shrunk on the way.
 const LARGEST: (u32, u32) = (16_384, 16_384);
@@ -61,6 +60,7 @@ pub(super) fn start(machine: &Machine) -> Command<Msg> {
         path_var: machine.path_var.clone(),
         profile_home: machine.profile_home.clone(),
         temp_root: machine.temp_root.clone(),
+        extra_arguments: machine.chromium_arguments.clone(),
     };
     Command::perform(move || Msg::Started(Handover::new(Engine::start(&options))))
 }
@@ -71,12 +71,27 @@ pub(super) type StartResult = Handover<Result<Started, StartError>>;
 /// The task that carries the engine's events to the screen until the engine is gone or the task
 /// is cancelled. Of the frames that came since it last looked only the newest of each tab is
 /// decoded, here rather than on the drawing thread.
-pub(super) fn pump(events: Receiver<Event>) -> (TaskId, Command<Msg>) {
+pub(super) fn pump(events: Receiver<Event>, seen: SeenCell, laid_out: (u32, u32)) -> (TaskId, Command<Msg>) {
     let task = Task::new("chromium", move |cx: &TaskCx<Msg>| {
+        let mut laid_out = laid_out;
         loop {
+            let cell = seen.pixels();
+            if cell != laid_out {
+                laid_out = cell;
+                cx.send(Msg::Cell(cell));
+            }
+            let first = match cx.recv_timeout(&events, CELL_LOOK) {
+                Ok(event) => event,
+                Err(RecvWait::Timeout) => continue,
+                Err(RecvWait::Closed) => return Err("the engine is gone".to_owned()),
+                Err(_) => return Err("stopped".to_owned()),
+            };
+            // What else came meanwhile is taken in the same turn, so a tab that sent frames faster
+            // than they are decoded has only its newest one decoded.
             let mut frames: HashMap<TabId, Vec<u8>> = HashMap::new();
+            let mut next = Some(first);
             let ended = loop {
-                match events.try_recv() {
+                match next.take().map_or_else(|| events.try_recv(), Ok) {
                     Ok(Event::Frame { tab, jpeg }) => {
                         frames.insert(tab, jpeg);
                     }
@@ -94,35 +109,40 @@ pub(super) fn pump(events: Receiver<Event>) -> (TaskId, Command<Msg>) {
             if ended {
                 return Err("the engine is gone".to_owned());
             }
-            if !cx.sleep(PACE) {
-                return Err("stopped".to_owned());
-            }
         }
     });
     let id = task.id();
     (id, Command::task(task))
 }
 
-/// The pixel size of one cell: the one the machine fixes, else the terminal's.
-pub(super) fn cell_pixels(machine: &Machine) -> (u32, u32) {
-    machine.cell.unwrap_or_else(terminal_cell)
-}
+/// The pixel size of a cell when the terminal reports none: a common terminal font's.
+pub(super) const FALLBACK_CELL: (u32, u32) = (10, 20);
 
-/// The pixel size of one of this terminal's cells: its window's pixels over its cells, or 10 × 20
-/// when it reports no pixels.
+/// The pixel size of one cell as the framework last reported it, `None` where the terminal
+/// reports none. The screen writes it each time it is drawn, the only place the framework's
+/// `Env::cell_pixels` can be read; the event task compares it with the cell the page was laid
+/// out for and says when it changed.
 ///
-/// A stopgap until the framework hands out the cell's pixel size itself (`Env::cell_pixels`,
-/// framework request 1 in `browser-istekleri.md`); the framework asks the terminal already and
-/// would answer the same everywhere.
-fn terminal_cell() -> (u32, u32) {
-    const FALLBACK: (u32, u32) = (10, 20);
-    let Ok(size) = crossterm::terminal::window_size() else { return FALLBACK };
-    if size.width == 0 || size.height == 0 || size.columns == 0 || size.rows == 0 {
-        return FALLBACK;
+/// A change of font size alone keeps the columns and rows, so no resize reports it; the page is
+/// laid out for the new cell all the same, else pictures are drawn at the wrong scale and clicks
+/// land beside what was clicked. A framework hook for this change is requested (request 14 in
+/// `browser-istekleri.md`); until it comes the event task looks between Chromium's events, at
+/// least every [`CELL_LOOK`], and carries it.
+#[derive(Debug, Clone, Default)]
+pub(super) struct SeenCell(Arc<Mutex<Option<(u16, u16)>>>);
+
+impl SeenCell {
+    /// Records what the framework reports now.
+    pub(super) fn set(&self, cell: Option<(u16, u16)>) {
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner) = cell;
     }
-    let width = u32::from(size.width) / u32::from(size.columns);
-    let height = u32::from(size.height) / u32::from(size.rows);
-    if width == 0 || height == 0 { FALLBACK } else { (width, height) }
+
+    /// The cell in pixels the page is to be laid out for: the reported one, else [`FALLBACK_CELL`].
+    pub(super) fn pixels(&self) -> (u32, u32) {
+        let cell = *self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        cell.filter(|(width, height)| *width > 0 && *height > 0)
+            .map_or(FALLBACK_CELL, |(width, height)| (u32::from(width), u32::from(height)))
+    }
 }
 
 /// The viewport in CSS pixels for a page area of `area` cells, each `cell` pixels.

@@ -22,6 +22,7 @@ back = "Atrás"
 forward = "Adelante"
 reload = "Recargar esta página"
 stop = "Detener la carga"
+reader = "Modo lectura"
 
 [browser.address]
 label = "Dirección"
@@ -29,16 +30,16 @@ placeholder = "Busca o escribe una dirección"
 
 [browser.profile]
 temporary = "perfil temporal"
-temporary-explained = "Otro qbrowser está usando tu perfil, así que esta ventana tiene uno propio. Sus cookies e inicios de sesión se borran al cerrarse."
+temporary-explained = "Otro qbrow está usando tu perfil, así que esta ventana tiene uno propio. Sus cookies e inicios de sesión se borran al cerrarse."
 
 [browser.chromium]
 missing = "No se encontró Chromium"
-missing-message = "qbrowser dibuja las páginas web con Chromium, que no está instalado en este equipo."
+missing-message = "qbrow dibuja las páginas web con Chromium, que no está instalado en este equipo."
 install = "Instalar aquí"
 show-command = "Mostrar el comando"
 command = "Este comando instala Chromium:"
 still-missing = "Todavía no se encuentra Chromium. Si lo instalaste en otro sitio, define QBROW_CHROMIUM con su ruta."
-unknown-system = "qbrowser no sabe cómo se instalan los programas en este sistema. Instala Chromium o Chrome como lo haga tu sistema, o define QBROW_CHROMIUM con la ruta de uno, y vuelve a iniciar qbrowser."
+unknown-system = "qbrow no sabe cómo se instalan los programas en este sistema. Instala Chromium o Chrome como lo haga tu sistema, o define QBROW_CHROMIUM con la ruta de uno, y vuelve a iniciar qbrow."
 failed = "Chromium no pudo iniciarse"
 stopped = "Chromium se detuvo"
 reason = "Lo último que dijo: {reason}"
@@ -56,7 +57,29 @@ delete = "Quitar"
 
 [browser.page]
 cannot-show = "Esta terminal no puede mostrar imágenes"
-cannot-show-message = "qbrowser muestra las páginas web como imágenes. Las muestra en una terminal con 256 colores o más, y con nitidez en una que hable el protocolo gráfico kitty o sixel."
+cannot-show-message = "qbrow muestra las páginas web como imágenes. Las muestra en una terminal con 256 colores o más, y con nitidez en una que hable el protocolo gráfico kitty o sixel."
+
+[browser.reader]
+open = "Abrir en modo lectura"
+image = "imagen"
+nothing = "En esta página no hay nada que leer"
+nothing-message = "Su texto principal son unas pocas palabras y el resto son menús y botones. Leerlo como una página de texto diría menos que la propia página."
+back = "Volver a la página"
+failed = "Esta página no se pudo leer"
+reason = "Dijo: {reason}"
+
+[browser.help]
+page = "cualquier otra tecla va a la página"
+
+[browser.dialog]
+says = "{host} dice"
+asks = "{host} pregunta"
+ok = "Aceptar"
+cancel = "Cancelar"
+leave-title = "¿Salir de esta página?"
+leave-message = "Puede que no se guarde lo que escribiste en esta página."
+leave = "Salir"
+stay = "Quedarse"
 
 [browser.cli]
 help = """
@@ -65,13 +88,13 @@ qbrow {version}: un navegador de verdad en la terminal
 Uso: qbrow [DIRECCIÓN]
 
   DIRECCIÓN          una dirección web, un archivo de este equipo o palabras que buscar con
-                     DuckDuckGo. Sin ella, qbrowser abre una pestaña vacía.
+                     DuckDuckGo. Sin ella, qbrow abre una pestaña vacía.
   --profile CARPETA  guarda cookies e inicios de sesión en CARPETA en vez del lugar habitual
   --version          muestra la versión
   --help             muestra esta ayuda
 
-qbrowser dibuja las páginas con Chromium o Chrome, que busca en PATH o en QBROW_CHROMIUM.
-Una vez al día, al arrancar, qbrowser pregunta a crates.io si hay una versión más nueva; puedes desactivarlo en los ajustes."""
+qbrow dibuja las páginas con Chromium o Chrome, que busca en PATH o en QBROW_CHROMIUM.
+Una vez al día, al arrancar, qbrow pregunta a crates.io si hay una versión más nueva; puedes desactivarlo en los ajustes."""
 unknown = "qbrow: opción desconocida {argument}; consulta qbrow --help"
 no-profile-folder = "qbrow: --profile necesita una carpeta después"
 
@@ -86,3 +109,48 @@ forward = "adelante"
 reload = "recargar"
 cancel = "cancelar"
 bookmark = "marcador"
+zoom-in = "ampliar"
+zoom-out = "reducir"
+zoom-reset = "restablecer el zoom"
+settings = "ajustes"
+history = "historial"
+copy = "copiar"
+reader = "modo lectura"
+
+[browser.zoom]
+level = "Zoom {n}%"
+in = "Ampliar"
+out = "Reducir"
+reset = "Restablecer"
+forgotten = "El nivel de zoom no se recuerda entre sesiones."
+
+# La página de ajustes: las filas propias de qbrow y los nombres de los buscadores que ofrece.
+[browser.settings]
+title = "Ajustes"
+heading = "Navegación"
+search-engine = "Buscador"
+search-engine-text = "Lo que la barra de direcciones hace con palabras escritas en vez de una dirección."
+start-page = "Página de inicio"
+start-page-blank = "Vacío: una pestaña nueva abre una página en blanco, con el teclado en la barra de direcciones."
+start-page-opens = "Una pestaña nueva abre {address}"
+start-page-searches = "Palabras, no una dirección: una pestaña nueva las busca con {engine}"
+start-page-placeholder = "una dirección o palabras"
+
+[browser.search-engine]
+duckduckgo = "DuckDuckGo"
+brave = "Brave"
+mojeek = "Mojeek"
+
+[browser.history]
+title = "Historial"
+empty = "Todavía no se ha visitado nada"
+not-saved = "No se ha podido guardar el historial"
+today = "Hoy"
+yesterday = "Ayer"
+back-list = "Dónde ha estado la pestaña"
+forward-list = "Adónde puede ir la pestaña"
+delete = "¿Quitar esta página del historial?"
+delete-message = "{page} ya no estará en el historial."
+
+[browser.menu]
+copy-address = "Copiar dirección"

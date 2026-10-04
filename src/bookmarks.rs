@@ -5,8 +5,10 @@
 //! (`~/.local/share/quvyta/browser/bookmarks`) rather than next to `browser.conf`. One bookmark is
 //! one line: the address, a tab, and the name. An address never holds a tab or a line break, and
 //! a name has them turned into spaces when it is kept, so every line reads back as it was written.
-//! The file is read at start and written whole after every change, through a temporary file and a
-//! rename, so a crash never leaves half a list. A line that is not a bookmark is skipped rather
+//! The file is read at start. Every change reads it again under a lock, makes the change on what
+//! it found and writes it whole through a temporary file and a rename, so a crash never leaves
+//! half a list and a second qbrowser window's bookmarks are never written over by the first's
+//! older copy. A line that is not a bookmark is skipped rather
 //! than refused: one broken line must not cost the rest.
 
 use std::io;
@@ -109,6 +111,33 @@ impl Bookmarks {
         atomic_write(file, text.as_bytes())
     }
 
+    /// Makes `change` on the list kept in `file` as it is on disk now, not as this copy last
+    /// saw it, and writes the result back; returns the list as it now stands and whether
+    /// `change` changed anything. Another qbrowser window changes the same file: reading it again
+    /// under the lock `<file>.lock` means its bookmarks are kept, and the two windows never write
+    /// at the same time.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error of making the folder, taking the lock or writing the file. The file is
+    /// left as it was.
+    pub fn update(file: &Path, change: impl FnOnce(&mut Self) -> bool) -> io::Result<(Self, bool)> {
+        if let Some(folder) = file.parent() {
+            std::fs::create_dir_all(folder)?;
+        }
+        let mut lock_name = file.as_os_str().to_owned();
+        lock_name.push(".lock");
+        let lock = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(lock_name)?;
+        // Held until `lock` is dropped at the end, released by the system if this process dies.
+        lock.lock()?;
+        let mut list = Self::read(file);
+        let changed = change(&mut list);
+        if changed {
+            list.write(file)?;
+        }
+        Ok((list, changed))
+    }
+
     /// The bookmarks, in their order.
     #[must_use]
     pub fn all(&self) -> &[Bookmark] {
@@ -193,6 +222,27 @@ mod tests {
         std::fs::remove_dir_all(&folder).unwrap();
         assert_eq!(read, bookmarks);
         assert_eq!(read.all()[0].name, "Tabs here, lines too");
+    }
+
+    #[test]
+    fn two_windows_that_each_keep_a_page_keep_both() {
+        let folder = std::env::temp_dir().join(format!("qbrowser-bookmarks-two-{}", std::process::id()));
+        let file = folder.join(FILE);
+        let (mut first, _) =
+            Bookmarks::update(&file, |list| list.add(Bookmark::new("https://one.example/", "One"))).unwrap();
+        // The second window started while the file held one bookmark, and keeps a page.
+        let (second, added) =
+            Bookmarks::update(&file, |list| list.add(Bookmark::new("https://two.example/", "Two"))).unwrap();
+        assert!(added);
+        assert_eq!(urls(&second), ["https://one.example/", "https://two.example/"]);
+        // The first window still holds its older copy when it keeps a third page.
+        assert_eq!(urls(&first), ["https://one.example/"]);
+        (first, _) =
+            Bookmarks::update(&file, |list| list.add(Bookmark::new("https://three.example/", "Three"))).unwrap();
+        let on_disk = Bookmarks::read(&file);
+        std::fs::remove_dir_all(&folder).unwrap();
+        assert_eq!(urls(&on_disk), ["https://one.example/", "https://two.example/", "https://three.example/"]);
+        assert_eq!(first, on_disk, "the window now holds what is on disk");
     }
 
     #[test]

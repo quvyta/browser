@@ -79,7 +79,9 @@ fn address_for(argument: &str, cwd: &Path) -> String {
     let is_web = argument.contains("://") || (argument.contains(':') && !argument.starts_with('/'));
     match path.canonicalize() {
         Ok(found) if !is_web => file_address(&found),
-        _ => address::destination(argument),
+        // The command line is read before `browser.conf` is, so words here are searched for with
+        // the default engine; the one the person chose is used from the address bar on.
+        _ => address::destination(argument, address::SearchEngine::DuckDuckGo),
     }
 }
 

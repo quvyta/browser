@@ -32,16 +32,28 @@ pub fn run() -> io::Result<ExitCode> {
         Invocation::Screen(start) => start,
         other => return Ok(answer(&other)),
     };
-    let opening = Opening::new(Machine::here(start.profile.clone()), &start);
-    locales::LOCALES
+    runtime(Machine::here(start.profile.clone()), &start).run()?;
+    Ok(ExitCode::SUCCESS)
+}
+
+/// The runtime that shows the screen on `machine`: qbrow's own languages, keys and icons, its
+/// saved look, and, where the machine has a Quvyta folder, membership of the ecosystem, so a look
+/// another Quvyta application changes while qbrow is open is followed at once. The settings and
+/// preferences given here are used as they are and not read twice.
+pub fn runtime(machine: Machine, start: &cli::Start) -> Runtime<app::Browser> {
+    let config = machine.config.clone();
+    let opening = Opening::new(machine, start);
+    let runtime = locales::LOCALES
         .iter()
         .fold(Runtime::new(opening.browser), |runtime, (file, text)| runtime.locale_source(*file, *text))
         .keymap_source(locales::KEYMAP.0, locales::KEYMAP.1)
         .icon_source(locales::ICONS.0, locales::ICONS.1)
         .settings(&opening.settings)
-        .preferences(&opening.preferences)
-        .run()?;
-    Ok(ExitCode::SUCCESS)
+        .preferences(&opening.preferences);
+    match config {
+        Some(folder) => runtime.member_in(qframe::storage::Ecosystem::QUVYTA, folder, app::APP),
+        None => runtime,
+    }
 }
 
 /// Says what a command line that opens no screen asks for, in the person's language, and gives the

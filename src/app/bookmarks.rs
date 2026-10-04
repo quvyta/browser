@@ -3,17 +3,12 @@
 //! bookmarks the address bar suggests while the person types. The list on disk is
 //! [`crate::bookmarks`]'s.
 //!
-//! The suggestions are qbrowser's own small layer, kept whole in this file: the framework's text
-//! field has no list of suggestions yet. [`AddressField`] is the framework's `TextInput` with the
-//! list's arrows in front of it, and the list is a framework `List` in a `Popover` under the
-//! field.
+//! The suggestions are the framework's own list under its text field: qbrow hands it the matching
+//! bookmarks and hears which one was chosen.
 
-use qframe::event::{Event, KeyKind, MouseButton, MouseKind};
-use qframe::keymap::Key;
 use qframe::prelude::*;
 use qframe::text;
-use qframe::widget::{EventCx, MeasureCx, PaintCx, Widget};
-use qframe::widgets::{ContextItem, ContextMenu, IconButton, Popover, TextInput, Toast, Tooltip};
+use qframe::widgets::{ContextItem, ContextMenu, IconButton, Popover, Suggestion, TextInput, Toast, Tooltip};
 
 use super::{Browser, Msg, view};
 use crate::bookmarks::{Bookmark, Bookmarks};
@@ -24,18 +19,10 @@ const NAME_CELLS: u16 = 24;
 /// The toast of the bookmarks, so a quick second change replaces the first one's note.
 const TOAST: &str = "bookmarks";
 
-/// The bookmarks the address bar suggests for what was typed, and the one the arrows chose.
+/// The bookmarks the address bar suggests for what was typed.
 #[derive(Debug, Clone, Default)]
 pub(super) struct Suggestions {
     items: Vec<Bookmark>,
-    highlight: Option<usize>,
-}
-
-impl Suggestions {
-    /// Whether the list shows.
-    fn open(&self) -> bool {
-        !self.items.is_empty()
-    }
 }
 
 impl Browser {
@@ -61,7 +48,7 @@ impl Browser {
         }
         let bookmark = Bookmark::new(url, &tab.title);
         let toast = Toast::success(t!("browser.bookmarks.added")).body(bookmark.label().to_owned());
-        self.change_bookmarks(|bookmarks| bookmarks.add(bookmark), toast)
+        self.change_bookmarks(|bookmarks| bookmarks.add(bookmark.clone()), toast)
     }
 
     /// Lets the bookmark of `url` go.
@@ -74,21 +61,35 @@ impl Browser {
     }
 
     /// Changes the list with `change` and writes it; says `done`, or that the file could not be
-    /// written. The page area is laid out again when the bar came or went.
-    fn change_bookmarks(&mut self, change: impl FnOnce(&mut Bookmarks) -> bool, done: Toast<Msg>) -> Command<Msg> {
+    /// written. The change is made on the file as it is now, so what another qbrowser window kept
+    /// meanwhile stays, and this window's list becomes that file's. The page area is laid out
+    /// again when the bar came or went.
+    fn change_bookmarks(&mut self, change: impl Fn(&mut Bookmarks) -> bool, done: Toast<Msg>) -> Command<Msg> {
         let rows = self.bookmark_rows();
-        if !change(&mut self.bookmarks) {
-            return Command::none();
-        }
+        // A few lines, written at once rather than in the background: two quick changes then
+        // land in the order they were made.
+        let outcome = match self.machine.bookmarks.as_deref() {
+            None => Ok(change(&mut self.bookmarks)),
+            Some(file) => match Bookmarks::update(file, &change) {
+                Ok((list, changed)) => {
+                    self.bookmarks = list;
+                    Ok(changed)
+                }
+                // The change still holds for this run, so the person sees it made.
+                Err(error) => {
+                    change(&mut self.bookmarks);
+                    Err(error)
+                }
+            },
+        };
         if self.bookmark_rows() != rows {
             self.more_bookmarks = false;
             self.resized(self.size);
         }
-        // A few lines, written at once rather than in the background: two quick changes then
-        // land in the order they were made.
-        let written = self.machine.bookmarks.as_deref().map_or(Ok(()), |file| self.bookmarks.write(file));
-        let toast = match written {
-            Ok(()) => done,
+        let toast = match outcome {
+            Ok(true) => done,
+            // The file already was as asked, another window having done it: nothing to say.
+            Ok(false) => return Command::none(),
             Err(error) => Toast::warning(t!("browser.bookmarks.not-saved")).body(error.to_string()),
         };
         Command::toast(toast.key(TOAST))
@@ -100,9 +101,9 @@ impl Browser {
         if new_tab { self.new_tab(url) } else { self.go(url) }
     }
 
-    /// The suggestions for `typed`, the arrows' choice forgotten.
+    /// The suggestions for `typed`.
     pub(super) fn suggest(&mut self, typed: &str) {
-        self.suggestions = Suggestions { items: self.bookmarks.matching(typed), highlight: None };
+        self.suggestions = Suggestions { items: self.bookmarks.matching(typed) };
     }
 
     /// Closes the list of suggestions; the typed text stays.
@@ -110,23 +111,10 @@ impl Browser {
         self.suggestions = Suggestions::default();
     }
 
-    /// Moves the arrows' choice `step` rows, from nothing to the first or the last row and back
-    /// to nothing past the ends, where Enter goes to the typed text again.
-    pub(super) fn step_suggestion(&mut self, step: isize) {
-        let count = self.suggestions.items.len();
-        if count == 0 {
-            return;
-        }
-        let rows = count.cast_signed() + 1;
-        let at = self.suggestions.highlight.map_or(count, |row| row).cast_signed();
-        let next = (at + step).rem_euclid(rows).cast_unsigned();
-        self.suggestions.highlight = (next < count).then_some(next);
-    }
-
-    /// Where Enter in the address bar goes: the suggestion the arrows chose, else the typed text.
+    /// Where Enter in the address bar goes when no suggestion was chosen: the typed text. A chosen
+    /// row comes as [`Msg::OpenSuggestion`] instead.
     pub(super) fn submit(&mut self, typed: &str) -> Command<Msg> {
-        let chosen = self.suggestions.highlight.and_then(|row| self.suggestions.items.get(row)).map(|b| b.url.clone());
-        self.go(chosen.as_deref().unwrap_or(typed))
+        self.go(typed)
     }
 
     /// Opens the suggestion on row `row`.
@@ -135,8 +123,8 @@ impl Browser {
         self.go(&url)
     }
 
-    /// The star: filled while the page is kept, open while it is not, and not there to press on an
-    /// empty tab.
+    /// The star: filled and in the accent colour while the page is kept, so the state shows in its
+    /// shape and its colour alike, open while it is not, and not there to press on an empty tab.
     pub(super) fn star(&self, ui: &mut View<'_, Msg>) {
         let kept = self.bookmarked();
         let (icon, tip) = if kept {
@@ -144,40 +132,30 @@ impl Browser {
         } else {
             ("browser.star", t!("browser.bookmarks.add"))
         };
-        ui.add(IconButton::new(icon).tooltip(tip).disabled(self.tab().address().is_empty()).on_press(Msg::Bookmark))
-            .id("star");
+        ui.add(
+            IconButton::new(icon)
+                .tooltip(tip)
+                .selected(kept)
+                .disabled(self.tab().address().is_empty())
+                .on_press(Msg::Bookmark),
+        )
+        .id("star");
     }
 
     /// The address field while the person types in it, with the bookmarks it suggests below it.
     pub(super) fn address_field(&self, ui: &mut View<'_, Msg>, text: &str) {
-        let suggestions = &self.suggestions;
-        let field = AddressField {
-            input: TextInput::new(text)
+        let rows = self.suggestions.items.iter().map(|b| Suggestion::new(b.label()).detail(b.url.clone()));
+        ui.add(
+            TextInput::new(text)
                 .placeholder(t!("browser.address.placeholder"))
                 .select_all_on_focus()
                 .on_change(Msg::LocationTyped)
-                .on_submit(Msg::Go),
-            open: suggestions.open(),
-        };
-        // As wide as the field: the toolbar's buttons, gaps and edges take the rest of the row, and
-        // the popover's padding goes round the list.
-        let padding = ui.env().theme().style("popover", None, &[]).pair("padding").map_or(0, |(_, sides)| sides * 2);
-        let width = self.size.width.saturating_sub(view::TOOLBAR_CELLS + padding).max(20);
-        Popover::new(suggestions.open())
-            .on_dismiss(Msg::CloseSuggestions)
-            .anchor(|ui| {
-                ui.add(field).fill_width().id(view::LOCATION);
-            })
-            .content(|ui| {
-                let rows = suggestions.items.iter().map(|b| ListItem::new(b.label()).detail(b.url.clone()));
-                let count = u16::try_from(suggestions.items.len()).unwrap_or(u16::MAX);
-                ui.add(List::new(rows).selected(suggestions.highlight).on_activate(Msg::OpenSuggestion))
-                    .width(Length::Cells(width))
-                    .height(Length::Cells(count))
-                    .id("suggestions");
-            })
-            .show(ui)
-            .fill_width();
+                .on_submit(Msg::Go)
+                .suggestions(rows)
+                .on_suggestion(Msg::OpenSuggestion),
+        )
+        .fill_width()
+        .id(view::LOCATION);
     }
 
     /// The bar of bookmarks, while there are any: each one a button with its name, and "More"
@@ -248,90 +226,13 @@ fn bookmark_button(ui: &mut View<'_, Msg>, bookmark: &Bookmark, name: String) {
     ];
     ui.add_with(Tooltip::new(url.clone()), |ui| {
         ui.add_with(ContextMenu::new(menu), |ui| {
-            ui.add(BarButton {
-                button: Button::new(name).on_press(Msg::OpenBookmark(url.clone(), false)),
-                on_middle: Msg::OpenBookmark(url, true),
-            });
+            ui.add(
+                Button::new(name)
+                    .on_press(Msg::OpenBookmark(url.clone(), false))
+                    .on_middle_press(Msg::OpenBookmark(url, true)),
+            );
         });
     });
-}
-
-/// The framework's `Button` that also answers a middle click, as a bookmark does by opening in a
-/// new tab. Everything else is the button's own.
-struct BarButton {
-    button: Button<Msg>,
-    on_middle: Msg,
-}
-
-impl Widget<Msg> for BarButton {
-    fn measure(&self, cx: &mut MeasureCx<'_>, available: Size) -> Size {
-        self.button.measure(cx, available)
-    }
-
-    fn paint(&self, cx: &mut PaintCx<'_>, area: Rect) {
-        self.button.paint(cx, area);
-    }
-
-    fn event(&self, cx: &mut EventCx<'_, Msg>, event: &Event) -> bool {
-        if let Event::Mouse(mouse) = event
-            && mouse.kind == MouseKind::Down(MouseButton::Middle)
-        {
-            cx.emit(self.on_middle.clone());
-            return true;
-        }
-        self.button.event(cx, event)
-    }
-
-    fn focusable(&self) -> bool {
-        self.button.focusable()
-    }
-}
-
-/// The framework's `TextInput` with the list of suggestions' arrows in front of it: while the list
-/// is open ↑ and ↓ move through it. Every other key and all drawing are the field's own; Esc,
-/// which the field leaves alone, reaches the popover around it, which closes the list and keeps
-/// the typed text.
-struct AddressField {
-    input: TextInput<Msg>,
-    open: bool,
-}
-
-impl Widget<Msg> for AddressField {
-    fn measure(&self, cx: &mut MeasureCx<'_>, available: Size) -> Size {
-        self.input.measure(cx, available)
-    }
-
-    fn paint(&self, cx: &mut PaintCx<'_>, area: Rect) {
-        self.input.paint(cx, area);
-    }
-
-    fn paint_overlay(&self, cx: &mut PaintCx<'_>, anchor: Rect) {
-        self.input.paint_overlay(cx, anchor);
-    }
-
-    fn event(&self, cx: &mut EventCx<'_, Msg>, event: &Event) -> bool {
-        if self.open
-            && let Event::Key(key) = event
-            && key.kind != KeyKind::Release
-        {
-            let msg = if key.is_plain(Key::Down) {
-                Some(Msg::Suggest(1))
-            } else if key.is_plain(Key::Up) {
-                Some(Msg::Suggest(-1))
-            } else {
-                None
-            };
-            if let Some(msg) = msg {
-                cx.emit(msg);
-                return true;
-            }
-        }
-        self.input.event(cx, event)
-    }
-
-    fn focusable(&self) -> bool {
-        self.input.focusable()
-    }
 }
 
 #[cfg(test)]

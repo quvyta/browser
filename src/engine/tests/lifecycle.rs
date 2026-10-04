@@ -23,8 +23,9 @@ fn without_chromium_starting_says_not_found() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_second_engine_on_the_same_profile_runs_on_a_temporary_one_that_is_removed() {
-    let _slot = Slot::take();
+    let _slot = Slot::take_many(2);
     let scratch = Scratch::new();
     let options = scratch.options();
     let first = Browser::start(&options);
@@ -45,6 +46,7 @@ fn a_second_engine_on_the_same_profile_runs_on_a_temporary_one_that_is_removed()
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn after_shutdown_no_process_runs_on_the_profile() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -58,15 +60,21 @@ fn after_shutdown_no_process_runs_on_the_profile() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_chromium_that_ignores_being_closed_is_killed_with_its_helpers() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
     let browser = Browser::start(&scratch.options());
     let profile = browser.engine.profile().path.to_string_lossy().into_owned();
     browser.open(&page("/links"));
-    // A stopped browser process cannot answer Browser.close; only the kill ends it.
+    // A stopped browser process cannot answer Browser.close; only the kill ends it. The stop is
+    // sent the way the product sends its signals, so this test does not need a program that is
+    // not on every machine. It needs nothing to undo: SIGKILL is not caught and not ignored, and
+    // a stopped process is still killed by it, so the group kill below reaches the browser even
+    // though it never ran again.
     let pid = browser.engine.chromium_pid();
-    assert!(Command::new("kill").args(["-STOP", &pid.to_string()]).status().unwrap().success());
+    let stopped = rustix::process::Pid::from_raw(pid.try_into().expect("a process number")).expect("not zero");
+    rustix::process::kill_process(stopped, rustix::process::Signal::STOP).expect("the stop is sent");
     let (done_tx, done) = mpsc::channel();
     let started = Instant::now();
     thread::spawn(move || {
@@ -79,6 +87,24 @@ fn a_chromium_that_ignores_being_closed_is_killed_with_its_helpers() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
+fn chromium_starts_with_no_way_to_reach_the_desk() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let browser = Browser::start(&scratch.options());
+    let pid = browser.engine.chromium_pid();
+    let environ = std::fs::read(format!("/proc/{pid}/environ")).expect("Chromium's environment");
+    for name in ["DISPLAY", "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR"] {
+        // Only what this machine has can be checked: a variable nobody set reaches nothing.
+        if std::env::var_os(name).is_some() {
+            let held = environ.split(|byte| *byte == 0).any(|entry| entry.starts_with(format!("{name}=").as_bytes()));
+            assert!(!held, "{name} reaches Chromium:\n{}", String::from_utf8_lossy(&environ));
+        }
+    }
+}
+
+#[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn chromium_ending_on_its_own_is_reported_as_gone() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -93,6 +119,7 @@ fn chromium_ending_on_its_own_is_reported_as_gone() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn an_orphan_chromium_left_on_the_profile_is_ended_by_the_next_start() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -141,4 +168,55 @@ impl Drop for Orphan {
         }
         let _ = self.0.wait();
     }
+}
+
+/// The inodes of the sockets the processes `pids` hold.
+fn sockets_of(pids: &[u32]) -> Vec<String> {
+    let mut inodes = Vec::new();
+    for pid in pids {
+        let Ok(entries) = std::fs::read_dir(format!("/proc/{pid}/fd")) else { continue };
+        for entry in entries.flatten() {
+            let Ok(target) = std::fs::read_link(entry.path()) else { continue };
+            let target = target.to_string_lossy().into_owned();
+            if let Some(inode) = target.strip_prefix("socket:[").and_then(|rest| rest.strip_suffix(']')) {
+                inodes.push(inode.to_owned());
+            }
+        }
+    }
+    inodes
+}
+
+/// The inodes of the TCP sockets on this machine that listen for connections.
+fn listening_tcp() -> Vec<String> {
+    let mut inodes = Vec::new();
+    for table in ["/proc/net/tcp", "/proc/net/tcp6"] {
+        let Ok(text) = std::fs::read_to_string(table) else { continue };
+        for line in text.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            // The fourth column is the state; 0A is LISTEN. The tenth is the socket's inode.
+            if fields.get(3) == Some(&"0A")
+                && let Some(inode) = fields.get(9)
+            {
+                inodes.push((*inode).to_owned());
+            }
+        }
+    }
+    inodes
+}
+
+#[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
+fn no_chromium_process_listens_on_a_port_anyone_on_the_machine_could_reach() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let browser = Browser::start(&scratch.options());
+    let profile = browser.engine.profile().path.to_string_lossy().into_owned();
+    let tab = browser.open(&page("/links"));
+    assert_eq!(browser.eval(&tab, "document.title"), "Links", "the browser is driven all the same");
+    let pids = super::fixture::processes_mentioning(&profile);
+    assert!(!pids.is_empty(), "Chromium runs on the profile");
+    let held = sockets_of(&pids);
+    let listening: Vec<String> = listening_tcp().into_iter().filter(|inode| held.contains(inode)).collect();
+    assert!(listening.is_empty(), "Chromium listens on a TCP port (socket inodes {listening:?})");
+    browser.engine.shutdown();
 }

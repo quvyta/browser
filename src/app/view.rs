@@ -1,23 +1,21 @@
 //! Drawing the screen: the tab strip, the toolbar, and the page or what stands in its place.
 
-use std::time::Duration;
-
 use qframe::event::{Event, MouseButton, MouseKind};
 use qframe::prelude::*;
 use qframe::style::CellStyle;
 use qframe::widget::{EventCx, MeasureCx, PaintCx, Widget};
-use qframe::widgets::{Badge, EmptyState, IconButton, Spinner, TabWidth, Tabs, Tooltip};
+use qframe::widgets::{
+    Badge, ContextMenu, EmptyState, HelpLayer, IconButton, Spinner, TabWidth, Tabs, ToastKind, Tooltip,
+};
 
-use super::{Browser, Missing, Msg, Phase};
+use super::menu::PageUnder;
+use super::reader;
+use super::{Browser, Missing, Msg, Phase, history::Arrow};
 use crate::page_view::PageView;
 
 /// The rows above the page: the tab strip and the toolbar. The bar of bookmarks adds one while
 /// there are any.
 pub(super) const CHROME_ROWS: u16 = 2;
-
-/// The toolbar's cells beside the address field: its two edge cells, back, forward, reload and the
-/// star three each, the loading mark one, and the five gaps between them.
-pub(super) const TOOLBAR_CELLS: u16 = 2 + 4 * 3 + 1 + 5;
 
 /// The name of the page area, which has the keyboard whenever nobody types an address.
 pub(super) const PAGE: &str = "page";
@@ -25,45 +23,73 @@ pub(super) const PAGE: &str = "page";
 /// The name of the address field, which takes the keyboard when it opens.
 pub(super) const LOCATION: &str = "location";
 
-/// Below this size nothing useful fits (design §2).
+/// The name of the settings screen, which takes the keyboard while it is open.
+pub(super) const SETTINGS: &str = "settings";
+
+/// The name of the reading area, which holds the keyboard while the page is being read as text.
+pub(super) const READING: &str = "reading";
+
+/// The name of the settings screen's list of rows, the part of it the arrow keys walk.
+pub(super) const SETTINGS_ROWS: &str = "settings-rows";
+
+/// The name of the start page's field on that screen.
+pub(super) const START_PAGE: &str = "start-page";
+
+/// Below this size the tabs, the toolbar and a readable piece of the page no longer fit together.
 const SMALLEST: Size = Size { width: 30, height: 8 };
 
 impl Browser {
     /// The whole screen at the size it is drawn in.
     pub(super) fn screen(&self, ui: &mut View<'_, Msg>) {
+        self.seen_cell.set(ui.env().cell_pixels());
         let size = ui.size();
         if size.width < SMALLEST.width || size.height < SMALLEST.height {
             ui.add(EmptyState::new(t!("browser.too-small"))).fill();
             return;
         }
+        AppShell::new()
+            .header(|ui| {
+                ui.column(|ui| {
+                    self.strip(ui);
+                    self.toolbar(ui);
+                    self.bookmarks_bar(ui);
+                })
+                .fill_width();
+            })
+            .body(|ui| self.body(ui))
+            .show(ui);
+        self.dialog(ui);
+        if self.help_open {
+            // The one rule the keymap cannot list: every key not on it goes to the page.
+            ui.add(HelpLayer::new(Msg::Help(false)).hint("*", t!("browser.help.page")));
+        }
+    }
+
+    /// The page area: the page, the settings screen in its place, or why there is no page. It is
+    /// the only part of the shell that changes, so a person whose Chromium is missing, failed or
+    /// gone can still reach the settings from the gear and change how qbrowser looks and whether
+    /// it asks for its updates.
+    fn body(&self, ui: &mut View<'_, Msg>) {
+        if self.settings_open {
+            return self.settings_page(ui);
+        }
         match &self.phase {
             Phase::Missing(missing) => Self::missing(ui, missing),
             Phase::Failed(reason) => Self::failed(ui, t!("browser.chromium.failed"), reason),
             Phase::Gone(reason) => Self::failed(ui, t!("browser.chromium.stopped"), reason),
-            Phase::Starting | Phase::Running => {
-                AppShell::new()
-                    .header(|ui| {
-                        ui.column(|ui| {
-                            self.strip(ui);
-                            self.toolbar(ui);
-                            self.bookmarks_bar(ui);
-                        })
-                        .fill_width();
-                    })
-                    .body(|ui| self.page(ui))
-                    .show(ui);
-            }
+            Phase::Starting | Phase::Running if self.history_open => self.history_screen(ui),
+            Phase::Starting | Phase::Running => self.page(ui),
         }
     }
 
     /// The tabs, each named by its page, with a close mark on each and `+` after them.
     fn strip(&self, ui: &mut View<'_, Msg>) {
         let labels = self.tabs.iter().map(|tab| tab.label().map_or_else(|| t!("browser.tab.new"), str::to_owned));
-        let width = tab_width(ui.size().width, self.tabs.len());
         ui.add(
             Tabs::new(labels)
                 .active(self.active)
-                .tab_width(TabWidth::Fixed(width))
+                .tab_width(TabWidth::Fill)
+                .max_tab_width(TAB_WIDEST)
                 .on_select(Msg::SelectTab)
                 .closable(Msg::CloseTab)
                 .on_add(|| Msg::NewTab),
@@ -73,8 +99,8 @@ impl Browser {
         .id("tabs");
     }
 
-    /// Back, forward, reload or stop, the address, the star, the loading mark and the temporary
-    /// profile.
+    /// Back, forward, reload or stop, the address, the star, the loading mark, the temporary
+    /// profile and the settings gear.
     fn toolbar(&self, ui: &mut View<'_, Msg>) {
         let tab = self.tab();
         ui.row(|ui| {
@@ -85,6 +111,7 @@ impl Browser {
                     .on_press(Msg::Back),
             )
             .id("back");
+            self.steps_button(ui, Arrow::Back);
             ui.add(
                 IconButton::new("chevron-right")
                     .tooltip(t!("browser.toolbar.forward"))
@@ -92,11 +119,12 @@ impl Browser {
                     .on_press(Msg::Forward),
             )
             .id("forward");
+            self.steps_button(ui, Arrow::Forward);
             if tab.loading {
                 ui.add(IconButton::new("close").tooltip(t!("browser.toolbar.stop")).on_press(Msg::Stop)).id("stop");
             } else {
                 ui.add(
-                    IconButton::new("browser.reload")
+                    IconButton::new("refresh")
                         .tooltip(t!("browser.toolbar.reload"))
                         .disabled(tab.id.is_none())
                         .on_press(Msg::Reload),
@@ -115,14 +143,22 @@ impl Browser {
                 }
             }
             self.star(ui);
+            self.reader(ui);
+            self.zoom(ui);
             let busy = self.phase == Phase::Starting || tab.busy();
-            ui.add(Loading { busy }).id("loading");
+            ui.add(Spinner::new().delayed(busy)).id("loading");
             if self.temporary {
                 ui.add_with(Tooltip::new(t!("browser.profile.temporary-explained")), |ui| {
                     ui.add(Badge::new(t!("browser.profile.temporary")).variant("warning"));
                 })
                 .id("temporary");
             }
+            ui.add(
+                IconButton::new("settings")
+                    .tooltip(t!("browser.settings.title"))
+                    .on_press(Msg::Settings(!self.settings_open)),
+            )
+            .id(SETTINGS);
         })
         .gap(1)
         .padding(Padding::symmetric(0, 1))
@@ -130,28 +166,59 @@ impl Browser {
         .fill_width();
     }
 
-    /// The page area: the page, or why it cannot be shown.
+    /// The reading button, beside the star: the page's own text where the page's picture is, for a
+    /// terminal that draws pictures too small to read and for one that draws none at all.
+    fn reader(&self, ui: &mut View<'_, Msg>) {
+        let open = self.reading();
+        ui.add(
+            IconButton::new("browser.reader")
+                .tooltip(t!("browser.toolbar.reader"))
+                .selected(open)
+                .disabled(self.tab().id.is_none())
+                .on_press(Msg::Reader(!open)),
+        )
+        .id("reader");
+    }
+
+    /// The page area: the page, reading mode in its place, or why the page cannot be shown.
     fn page(&self, ui: &mut View<'_, Msg>) {
         let tab = self.tab();
         if tab.crashed {
             ui.add(
                 EmptyState::new(t!("browser.tab.crashed"))
-                    .icon("warning")
+                    .tone(ToastKind::Danger)
                     .message(t!("browser.tab.crashed-message"))
                     .action(Button::new(t!("browser.tab.reload")).variant("primary").on_press(Msg::Reload)),
             )
             .fill();
             return;
         }
+        if !matches!(tab.reading, reader::Mode::Closed) {
+            return self.reading_page(ui, &tab.reading);
+        }
         let drawn = self.graphics.can_draw();
-        ui.stack(|ui| {
-            ui.add(PageView::new(tab.picture.as_ref().filter(|_| drawn)).on_input(Msg::Page)).fill().id(PAGE);
-            // Clicks still reach the page beneath: this says only why nothing is drawn. The page's
-            // title and address stay on the strip and in the address bar.
-            if !drawn {
-                ui.add(EmptyState::new(t!("browser.page.cannot-show")).message(t!("browser.page.cannot-show-message")))
+        ui.add_with(ContextMenu::new(self.menu_items()), |ui| {
+            ui.stack(|ui| {
+                ui.add_with(PageUnder::new(|(column, row)| Msg::PageRight { column, row }), |ui| {
+                    ui.add(PageView::new(tab.picture.as_ref().filter(|_| drawn)).on_input(Msg::Page)).fill();
+                })
+                .fill()
+                .id(PAGE);
+                // Clicks still reach the page beneath: this says only why nothing is drawn. The page's
+                // title and address stay on the strip and in the address bar, and the page is still
+                // there to be read as text.
+                if !drawn {
+                    ui.add(
+                        EmptyState::new(t!("browser.page.cannot-show"))
+                            .message(t!("browser.page.cannot-show-message"))
+                            .action(
+                                Button::new(t!("browser.reader.open")).variant("primary").on_press(Msg::Reader(true)),
+                            ),
+                    )
                     .fill();
-            }
+                }
+                self.drop_down_layer(ui);
+            });
         })
         .fill();
     }
@@ -165,27 +232,22 @@ impl Browser {
         if missing.still_missing {
             message = format!("{message} {}", t!("browser.chromium.still-missing"));
         }
+        let mut state = EmptyState::new(t!("browser.chromium.missing")).tone(ToastKind::Warning).message(message);
+        if missing.command.is_some() {
+            state = state
+                .action(Button::new(t!("browser.chromium.install")).variant("primary").on_press(Msg::Install))
+                .action(Button::new(t!("browser.chromium.show-command")).on_press(Msg::ShowCommand));
+        }
         ui.column(|ui| {
-            ui.add(EmptyState::new(t!("browser.chromium.missing")).icon("warning").message(message)).fill_width();
-            if let Some(command) = &missing.command {
-                ui.row(|ui| {
-                    ui.add(Button::new(t!("browser.chromium.install")).variant("primary").on_press(Msg::Install))
-                        .id("install");
-                    ui.add(Button::new(t!("browser.chromium.show-command")).on_press(Msg::ShowCommand))
-                        .id("show-command");
+            ui.add(state).fill_width();
+            if let Some(command) = missing.command.as_ref().filter(|_| missing.command_shown) {
+                ui.column(|ui| {
+                    ui.add(Text::new(t!("browser.chromium.command")));
+                    ui.add(Text::new(command.line())).selectable(true).id("command");
                 })
-                .gap(2)
-                .justify(Align::Center)
+                .align(Align::Center)
+                .padding(Padding::symmetric(1, 0))
                 .fill_width();
-                if missing.command_shown {
-                    ui.column(|ui| {
-                        ui.add(Text::new(t!("browser.chromium.command")));
-                        ui.add(Text::new(command.line())).selectable(true).id("command");
-                    })
-                    .align(Align::Center)
-                    .padding(Padding::symmetric(1, 0))
-                    .fill_width();
-                }
             }
         })
         .gap(1)
@@ -196,7 +258,7 @@ impl Browser {
     /// Chromium did not start, or ended by itself: why, and the way to start it again.
     fn failed(ui: &mut View<'_, Msg>, title: String, reason: &str) {
         let mut state = EmptyState::new(title)
-            .icon("error")
+            .tone(ToastKind::Danger)
             .action(Button::new(t!("browser.chromium.restart")).variant("primary").on_press(Msg::Restart));
         if !reason.trim().is_empty() {
             state = state.message(t!("browser.chromium.reason", reason = reason));
@@ -206,31 +268,9 @@ impl Browser {
 }
 
 /// The widest a tab grows, in cells: about as wide as a desktop browser's tab, so one tab does
-/// not stretch across the whole strip with its close mark at the far edge.
+/// not stretch across the whole strip with its close mark at the far edge. Below that the tabs
+/// share the strip, down to the framework's readable floor, past which the strip scrolls.
 const TAB_WIDEST: u16 = 28;
-
-/// The narrowest a tab shrinks to before the strip scrolls sideways; the framework's own floor for
-/// shared tabs.
-const TAB_NARROWEST: u16 = 12;
-
-/// The cells the strip keeps after the tabs for `+`: the framework's add button, three cells, and
-/// the gap before it.
-const ADD_ROOM: u16 = 4;
-
-/// The cells the framework keeps between two tabs.
-const TAB_GAP: u16 = 1;
-
-/// How wide each of `count` tabs is on a strip `strip` cells wide: they share the strip as the
-/// framework's `TabWidth::Fill` does, but never grow past [`TAB_WIDEST`], and below
-/// [`TAB_NARROWEST`] the strip scrolls instead.
-///
-/// The framework's `Fill` has no widest size, so qbrowser works the width out itself and hands
-/// the framework a fixed one each frame.
-fn tab_width(strip: u16, count: usize) -> u16 {
-    let count = u16::try_from(count).unwrap_or(u16::MAX).max(1);
-    let room = strip.saturating_sub(ADD_ROOM).saturating_sub((count - 1).saturating_mul(TAB_GAP));
-    (room / count).clamp(TAB_NARROWEST, TAB_WIDEST)
-}
 
 /// The address as plain text in the toolbar: a click on it turns it into the field.
 struct AddressText {
@@ -270,103 +310,5 @@ impl Widget<Msg> for AddressText {
             }
             _ => false,
         }
-    }
-}
-
-/// How long loading runs before its mark shows: shorter work never blinks one (VISION §3).
-const SHOW_AFTER: Duration = Duration::from_millis(300);
-
-/// How long the mark stays once it shows, even when the loading ends sooner.
-const SHOW_AT_LEAST: Duration = Duration::from_millis(500);
-
-/// The loading mark: a spinner that shows only once loading has run 300 ms and then stays at
-/// least 500 ms.
-///
-/// The framework keeps this rule inside its own widgets and offers no spinner that follows it,
-/// so qbrowser keeps its own copy here until it does.
-struct Loading {
-    busy: bool,
-}
-
-/// Where the loading mark is in its life.
-#[derive(Debug, Clone, Copy, Default)]
-enum Mark {
-    /// Nothing loads and nothing shows.
-    #[default]
-    Idle,
-    /// Loading since this time; the mark waits for [`SHOW_AFTER`].
-    Waiting(Duration),
-    /// Shown since this time.
-    Shown(Duration),
-}
-
-impl Mark {
-    /// The mark at `now`, with loading `busy` or not.
-    fn next(self, busy: bool, now: Duration) -> Self {
-        let waiting = |since: Duration| if now >= since + SHOW_AFTER { Self::Shown(now) } else { Self::Waiting(since) };
-        match (self, busy) {
-            (Self::Idle | Self::Waiting(_), false) => Self::Idle,
-            (Self::Idle, true) => waiting(now),
-            (Self::Waiting(since), true) => waiting(since),
-            (Self::Shown(since), true) => Self::Shown(since),
-            (Self::Shown(since), false) if now < since + SHOW_AT_LEAST => Self::Shown(since),
-            (Self::Shown(_), false) => Self::Idle,
-        }
-    }
-
-    /// How long after `now` the mark may change while loading stays as it is.
-    fn change_in(self, busy: bool, now: Duration) -> Option<Duration> {
-        match self {
-            Self::Waiting(since) => Some((since + SHOW_AFTER).saturating_sub(now)),
-            Self::Shown(since) if !busy => Some((since + SHOW_AT_LEAST).saturating_sub(now)),
-            Self::Idle | Self::Shown(_) => None,
-        }
-    }
-}
-
-impl Widget<Msg> for Loading {
-    fn measure(&self, _cx: &mut MeasureCx<'_>, available: Size) -> Size {
-        Size::new(1, 1).min(available)
-    }
-
-    fn paint(&self, cx: &mut PaintCx<'_>, area: Rect) {
-        let now = cx.now();
-        let memory = cx.memory::<Mark>();
-        *memory = memory.next(self.busy, now);
-        let mark = *memory;
-        if let Some(delay) = mark.change_in(self.busy, now) {
-            cx.request_frame_in(delay);
-        }
-        if matches!(mark, Mark::Shown(_)) {
-            Widget::<Msg>::paint(&Spinner::new(), cx, area);
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn ms(value: u64) -> Duration {
-        Duration::from_millis(value)
-    }
-
-    #[test]
-    fn tabs_share_the_strip_up_to_a_desktop_tab_and_no_narrower_than_twelve() {
-        assert_eq!(tab_width(100, 1), TAB_WIDEST, "one tab does not stretch across the strip");
-        assert_eq!(tab_width(100, 5), 18, "five tabs share the 92 cells beside `+`");
-        assert_eq!(tab_width(100, 20), TAB_NARROWEST, "twenty scroll sideways");
-        assert_eq!(tab_width(0, 0), TAB_NARROWEST);
-    }
-
-    #[test]
-    fn the_mark_waits_300_ms_and_then_stays_500_ms() {
-        let quick = Mark::Idle.next(true, ms(0)).next(true, ms(299)).next(false, ms(299));
-        assert!(matches!(quick, Mark::Idle), "quick loading never shows the mark");
-        let shown = Mark::Idle.next(true, ms(0)).next(true, ms(300));
-        assert!(matches!(shown, Mark::Shown(_)));
-        assert!(matches!(shown.next(false, ms(799)), Mark::Shown(_)), "it stays half a second");
-        assert!(matches!(shown.next(false, ms(800)), Mark::Idle));
-        assert_eq!(Mark::Idle.next(true, ms(100)).change_in(true, ms(150)), Some(ms(250)));
     }
 }

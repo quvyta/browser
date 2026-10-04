@@ -4,9 +4,10 @@
 use qframe::graphics::Graphics;
 use serde_json::json;
 
-use super::{Scratch, Slot, cell_of, eval, find_in_row, open, page, until};
+use super::{Scratch, Slot, cell_of, eval, find_in_row, open, open_on, page, page_drawn, until, until_page};
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn a_target_blank_link_opens_a_tab_right_of_its_opener_and_shows_it() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -26,6 +27,7 @@ fn a_target_blank_link_opens_a_tab_right_of_its_opener_and_shows_it() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn the_close_mark_of_a_tab_closes_it_in_chromium_too() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -50,6 +52,7 @@ fn engine_lacks(engine: &crate::engine::Engine, tab: &crate::engine::TabId) -> b
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn closing_the_last_tab_leaves_an_empty_one_with_the_keyboard_in_the_address_bar() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -69,6 +72,7 @@ fn closing_the_last_tab_leaves_an_empty_one_with_the_keyboard_in_the_address_bar
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn plus_opens_an_empty_tab_and_what_is_typed_next_goes_into_its_address() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -87,6 +91,7 @@ fn plus_opens_an_empty_tab_and_what_is_typed_next_goes_into_its_address() {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn the_keys_open_close_and_change_tabs() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -116,6 +121,7 @@ fn open_tabs(h: &mut qframe::prelude::Harness<super::super::Browser>, count: usi
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn the_strip_is_one_row_above_the_toolbar_and_a_lone_tab_does_not_stretch_across_it() {
     let _slot = Slot::take();
     let scratch = Scratch::new();
@@ -160,4 +166,60 @@ fn the_strip_is_one_row_above_the_toolbar_and_a_lone_tab_does_not_stretch_across
             }
         }
     }
+}
+
+#[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
+fn the_tabs_open_at_quitting_come_back_at_the_next_start() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let mut h = open(&scratch, &page("/links"));
+    h.press("ctrl+t").type_text(&page("/third")).press("enter");
+    until(&mut h, "the second tab named", |h| find_in_row(h, "Third", 0).is_some());
+    h.click_text("Links");
+    until(&mut h, "the first tab on screen", |h| h.app().address() == page("/links"));
+    h.press("ctrl+q");
+    assert!(h.quit_requested());
+    drop(h);
+    let mut h = open_on(scratch.machine(), None);
+    until(&mut h, "both tabs back", |h| {
+        find_in_row(h, "Links", 0).is_some() && find_in_row(h, "Third", 0).is_some() && page_drawn(h)
+    });
+    assert_eq!(h.app().tab_count(), 2, "no empty tab besides them:\n{}", h.screen());
+    assert_eq!(h.app().address(), page("/links"), "the tab that was on screen is on screen again");
+    // An address on the command line opens after them, on screen.
+    h.press("ctrl+q");
+    drop(h);
+    let second = page("/second");
+    let h = open(&scratch, &second);
+    assert_eq!(h.app().tab_count(), 3, "{}", h.screen());
+    assert_eq!(h.app().address(), second);
+}
+
+#[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
+fn a_tab_closed_before_chromium_opened_it_does_not_come_back() {
+    let _slot = Slot::take();
+    let scratch = Scratch::new();
+    let links = page("/links");
+    let mut h = open(&scratch, &links);
+    // Open and close again before the screen has heard anything from Chromium: no time passes
+    // between the keys, as on a loaded machine where Chromium answers late.
+    h.press("ctrl+t").press("esc").press("ctrl+w");
+    assert_eq!(h.app().tab_count(), 1, "closed at once:\n{}", h.screen());
+    // Chromium opens the tab it was asked for, and it is closed then; a second tab opened after
+    // it shows that the answer for the first has been heard.
+    h.press("ctrl+t").type_text(&page("/second")).press("enter");
+    until(&mut h, "the second page drawn in its tab", |h| {
+        h.app().address() == page("/second") && h.app().active_tab().is_some()
+    });
+    until_page(&mut h, "document.title === 'Second'");
+    // Chromium's report of the first tab can come after the second page is drawn; two seconds
+    // of the screen hearing it out leave it time to.
+    let heard_out = std::time::Instant::now();
+    while heard_out.elapsed() < std::time::Duration::from_secs(2) {
+        h.advance(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert_eq!(h.app().tab_count(), 2, "the tab closed early never came back:\n{}", h.screen());
 }

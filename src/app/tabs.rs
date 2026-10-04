@@ -4,8 +4,10 @@
 use qframe::runtime::Command;
 use qframe::widgets::ImageData;
 
-use super::{Browser, Msg, view};
-use crate::engine::{Event, TabId};
+use super::dialog::PageDialog;
+use super::reader::Mode;
+use super::{Browser, Msg, view, zoom};
+use crate::engine::{Entry, Event, TabId};
 
 /// The address an empty tab opens.
 pub(super) const BLANK: &str = "about:blank";
@@ -25,9 +27,24 @@ pub(super) struct Tab {
     pub(super) can_back: bool,
     pub(super) can_forward: bool,
     pub(super) crashed: bool,
+    /// The per cent of its size the page is drawn at, while the tab is open and across a resize of
+    /// the terminal. Nothing is written to a file, so a new run starts every tab at 100%.
+    pub(super) level: u32,
+    /// The text the page last reported as selected, kept while the tab is not shown so that
+    /// coming back to it can still be copied; empty when the page has no selection.
+    pub(super) selection: String,
     /// The last picture of the page, kept while the tab is not shown so that coming back to it
     /// shows it at once.
     pub(super) picture: Option<ImageData>,
+    /// The dialog the page waits on, if it opened one.
+    pub(super) dialog: Option<PageDialog>,
+    /// The tab's own steps and which one it is at, as Chromium last reported them; `None` while
+    /// the tab is still opening, which is why the list beside the arrow is disabled then. It goes
+    /// when the tab navigates to a place that is not in it, and with the tab itself when it closes.
+    pub(super) history: Option<(usize, Vec<Entry>)>,
+    /// What reading mode is doing in this tab; the reading is the tab's own, so another tab comes
+    /// back to the words it was reading.
+    pub(super) reading: Mode,
 }
 
 impl Tab {
@@ -43,7 +60,12 @@ impl Tab {
             can_back: false,
             can_forward: false,
             crashed: false,
+            level: zoom::HOME,
+            selection: String::new(),
             picture: None,
+            dialog: None,
+            history: None,
+            reading: Mode::Closed,
         }
     }
 
@@ -89,6 +111,13 @@ impl Browser {
         if url == BLANK { self.open_location() } else { Command::focus(view::PAGE) }
     }
 
+    /// Opens an empty tab: on the start page, or on the blank page with the keyboard in the
+    /// address bar when there is no start page to open.
+    pub(super) fn new_empty_tab(&mut self) -> Command<Msg> {
+        let start = super::settings::start_address(&self.start_page, self.search_engine);
+        self.new_tab(&start)
+    }
+
     /// Asks Chromium to open the tab at `index`, when it runs and has not been asked yet.
     pub(super) fn ask_chromium(&mut self, index: usize) {
         let Some(engine) = &self.engine else { return };
@@ -109,6 +138,10 @@ impl Browser {
         let tab = self.tabs.remove(index);
         if let (Some(engine), Some(id)) = (&self.engine, &tab.id) {
             engine.close_tab(id);
+        } else if tab.requested.is_some() {
+            // Chromium is still opening it: it is closed once Chromium says it has, rather than
+            // coming back as a tab nobody asked for.
+            self.closed_unopened += 1;
         }
         self.after_removal(index)
     }
@@ -118,7 +151,7 @@ impl Browser {
     fn after_removal(&mut self, index: usize) -> Command<Msg> {
         if self.tabs.is_empty() {
             self.active = 0;
-            return self.new_tab(BLANK);
+            return self.new_empty_tab();
         }
         let was_active = index == self.active;
         if index < self.active || self.active >= self.tabs.len() {
@@ -141,7 +174,7 @@ impl Browser {
             self.location = None;
             self.show_active();
         }
-        Command::focus(view::PAGE)
+        Command::focus(self.page_focus())
     }
 
     /// Opens the tab `step` places along, going round at the ends.
@@ -158,11 +191,15 @@ impl Browser {
         }
     }
 
-    /// Gives the tab `id` the page area's size.
+    /// Gives the tab `id` the page area's size and the level it is zoomed at, so a tab opened or
+    /// resized while the level is not 100% is laid out for both at once.
     pub(super) fn size_tab(&self, id: &TabId) {
         if let Some(engine) = &self.engine {
             let (width, height) = self.viewport();
             engine.set_viewport(id, width, height);
+            if let Some(level) = self.position(id).map(|index| self.tabs[index].level) {
+                engine.set_zoom(id, level);
+            }
         }
     }
 
@@ -178,6 +215,7 @@ impl Browser {
             Event::TabClosed { tab } => {
                 if let Some(index) = self.position(&tab) {
                     self.tabs.remove(index);
+                    self.link = None;
                     return self.after_removal(index);
                 }
             }
@@ -190,11 +228,46 @@ impl Browser {
                     state.can_back = can_back;
                     state.can_forward = can_forward;
                     state.crashed = false;
+                    // Another page's text is not this one's, and the address a right press asked
+                    // for was this page's.
+                    state.selection.clear();
+                    self.link = None;
+                    // The words read are the words of the page that was there; under another
+                    // address they would be another page's words.
+                    state.reading = Mode::Closed;
+                    // The list was of a select on the page that is gone.
+                    if self.drop_down.as_ref().is_some_and(|list| list.tab == tab) {
+                        self.drop_down = None;
+                    }
+                }
+            }
+            Event::History { tab, current, entries } => {
+                let Some(index) = self.position(&tab) else { return Command::none() };
+                // The step the tab is at was seen now, so it is a visit of this profile; the list
+                // on the tab is Chromium's own, not a record qbrowser keeps of the walk. An empty
+                // tab's own address is not a page anyone visited.
+                let seen = entries.get(current).map(|entry| (entry.url.clone(), entry.title.clone()));
+                self.tabs[index].history = Some((current, entries));
+                if let Some((url, title)) = seen
+                    && url != BLANK
+                    && let Some(command) = self.visit(&url, &title)
+                {
+                    return command;
                 }
             }
             Event::Title { tab, title } => {
                 if let Some(index) = self.position(&tab) {
                     self.tabs[index].title = title;
+                }
+            }
+            Event::Selection { tab, text } => {
+                if let Some(index) = self.position(&tab) {
+                    self.tabs[index].selection = text;
+                }
+            }
+            Event::Answered { tab, value } => {
+                if self.tab().id.as_ref() == Some(&tab) {
+                    self.link = value.ok().and_then(|href| href.as_str().map(|href| (tab, href.to_owned())));
                 }
             }
             Event::Loading { tab, loading } => {
@@ -208,6 +281,16 @@ impl Browser {
                     self.tabs[index].loading = false;
                 }
             }
+            Event::Dialog { tab, kind, message, default_text } => {
+                if let Some(index) = self.position(&tab) {
+                    self.tabs[index].dialog = Some(PageDialog { kind, message, text: default_text });
+                }
+            }
+            Event::DialogClosed { tab } => {
+                if let Some(index) = self.position(&tab) {
+                    self.tabs[index].dialog = None;
+                }
+            }
             Event::Gone { reason } => return self.chromium_gone(reason),
         }
         Command::none()
@@ -218,7 +301,15 @@ impl Browser {
     fn tab_opened(&mut self, id: &TabId, opener: Option<&TabId>, url: &str) -> Command<Msg> {
         let asked =
             opener.is_none().then(|| self.tabs.iter().position(|tab| tab.id.is_none() && tab.requested.is_some()));
-        let index = match asked.flatten() {
+        let asked = asked.flatten();
+        if asked.is_none() && opener.is_none() && self.closed_unopened > 0 {
+            self.closed_unopened -= 1;
+            if let Some(engine) = &self.engine {
+                engine.close_tab(id);
+            }
+            return Command::none();
+        }
+        let index = match asked {
             Some(index) => {
                 let tab = &mut self.tabs[index];
                 tab.id = Some(id.clone());

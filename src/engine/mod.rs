@@ -8,10 +8,12 @@
 mod cdp;
 mod connection;
 mod find;
+mod history;
 pub mod input;
 mod process;
 mod procfs;
 mod profile;
+mod reader;
 mod tabs;
 
 #[cfg(test)]
@@ -28,10 +30,21 @@ use std::time::Duration;
 use serde_json::{Value, json};
 
 pub use find::find_chromium;
+pub use history::Entry;
 pub use input::{Button, KeyPress, Modifiers, Mouse};
 pub use profile::Profile;
+pub use reader::Reading;
+// The size a zoom makes of a page area, for the screen's own tests, which ask what the engine
+// hands Chromium without a browser to hand it to.
+#[cfg(test)]
+pub(crate) use tabs::{ZOOM_BOUNDS, css_pixels};
 
-use cdp::Wire;
+#[cfg(test)]
+// The application's tests end a process the way the product does. `procfs` is private to the
+// engine, and these are its only two signals, so they are lent out for as long as tests are built.
+pub(crate) use procfs::{kill_group, kill_process};
+
+use cdp::Work;
 use process::Chromium;
 use profile::Claim;
 use tabs::Command;
@@ -52,6 +65,10 @@ pub struct Options {
     pub profile_home: PathBuf,
     /// Where a temporary profile is made when the persistent one is in use.
     pub temp_root: PathBuf,
+    /// More command-line switches for Chromium, after qbrow's own; empty for the person's own
+    /// browser. The tests give theirs a proxy nobody listens on, so no page and none of
+    /// Chromium's own background requests reach the internet.
+    pub extra_arguments: Vec<OsString>,
 }
 
 /// Why the engine did not start.
@@ -110,12 +127,35 @@ pub enum Event {
         /// Whether there is somewhere to go forward to.
         can_forward: bool,
     },
+    /// The tab's history changed: every step, and which one the tab is at now.
+    History {
+        /// The tab.
+        tab: TabId,
+        /// Which of the `entries` the tab is at.
+        current: usize,
+        /// Every step of the tab's own history, the oldest first.
+        entries: Vec<Entry>,
+    },
     /// The page's title changed.
     Title {
         /// The tab.
         tab: TabId,
         /// The new title; empty when the page has none.
         title: String,
+    },
+    /// The page's text selection changed.
+    Selection {
+        /// The tab.
+        tab: TabId,
+        /// What the page has selected, exactly as it reports it; empty when it has no selection.
+        text: String,
+    },
+    /// The tab's page answered an [`Engine::ask`], with its value or why there is none.
+    Answered {
+        /// The tab.
+        tab: TabId,
+        /// The value the expression gave, or the exception it threw.
+        value: Result<Value, String>,
     },
     /// The page began or finished loading.
     Loading {
@@ -129,6 +169,25 @@ pub enum Event {
         /// The tab.
         tab: TabId,
     },
+    /// The page opened one of its own dialogs (`alert`, `confirm`, `prompt`, or the question
+    /// before leaving a page). The page waits, doing nothing, until it is answered with
+    /// [`Engine::answer_dialog`].
+    Dialog {
+        /// The tab.
+        tab: TabId,
+        /// Which dialog.
+        kind: DialogKind,
+        /// What the page says in it; empty for the question before leaving, whose words browsers
+        /// no longer let a page choose.
+        message: String,
+        /// The text a `prompt` offers to start with.
+        default_text: String,
+    },
+    /// The tab's dialog closed without an answer from qbrowser: the page went away under it.
+    DialogClosed {
+        /// The tab.
+        tab: TabId,
+    },
     /// Chromium ended without being asked to, and why: its last stderr line when it left one.
     Gone {
         /// Why.
@@ -136,9 +195,22 @@ pub enum Event {
     },
 }
 
+/// Which of a page's own dialogs is open.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DialogKind {
+    /// `alert()`: a message and one button.
+    Alert,
+    /// `confirm()`: a question, yes or no.
+    Confirm,
+    /// `prompt()`: a question with a line of text to answer.
+    Prompt,
+    /// The page asks whether to leave it, when it may lose what was typed in it.
+    BeforeUnload,
+}
+
 /// A running Chromium and the connection that drives it.
 pub struct Engine {
-    commands: Option<Sender<Command>>,
+    commands: Option<Sender<Work>>,
     socket: Option<JoinHandle<()>>,
     chromium: Chromium,
     claim: Claim,
@@ -157,14 +229,13 @@ impl Engine {
         let program =
             find_chromium(options.chromium.as_deref(), options.path_var.as_deref()).ok_or(StartError::NotFound)?;
         let mut claim = profile::claim(&options.profile_home, &options.temp_root).map_err(StartError::Failed)?;
-        let (chromium, address) = process::launch(&program, &claim.profile().path).map_err(StartError::Failed)?;
+        let process::Launched { chromium, mut wire, work, incoming } =
+            process::launch(&program, &claim.profile().path, &options.extra_arguments).map_err(StartError::Failed)?;
         let pid = chromium.pid();
         claim.record(pid);
         // On an early return from here on, dropping `chromium` ends it and dropping `claim`
         // releases the profile, in that order.
-        let mut wire = Wire::connect(&address).map_err(StartError::Failed)?;
         wire.call(None, "Target.setDiscoverTargets", json!({ "discover": true }));
-        let (commands, commands_rx) = mpsc::channel();
         let (events, events_rx) = mpsc::channel();
         let closing = Arc::new(AtomicBool::new(false));
         let socket = {
@@ -172,9 +243,10 @@ impl Engine {
             let tail = chromium.tail();
             thread::Builder::new()
                 .name("qbrowser-devtools".into())
-                .spawn(move || connection::run(wire, &commands_rx, events, &closing, &tail))
+                .spawn(move || connection::run(wire, &incoming, events, &closing, &tail))
                 .map_err(|error| StartError::Failed(error.to_string()))?
         };
+        let commands = work;
         let engine = Engine { commands: Some(commands), socket: Some(socket), chromium, claim, closing, pid };
         Ok((engine, events_rx))
     }
@@ -193,8 +265,15 @@ impl Engine {
 
     fn send(&self, command: Command) {
         if let Some(commands) = &self.commands {
-            let _ = commands.send(command);
+            let _ = commands.send(Work::Command(command));
         }
+    }
+
+    /// A way of asking the engine something from another thread: work the drawing thread must not
+    /// wait for, such as reading a page, takes one of these with it.
+    #[must_use]
+    pub fn client(&self) -> Client {
+        Client(self.commands.clone())
     }
 
     /// Opens a tab on `url`; answered by [`Event::TabOpened`] with no opener.
@@ -222,6 +301,13 @@ impl Engine {
         self.send(Command::History(tab.clone(), 1));
     }
 
+    /// Goes `by` steps through the tab's history, back when it is negative, the way the arrows go
+    /// one: a step chosen from the list beside an arrow is a step through the tab's own history,
+    /// not a new page laid on top of it.
+    pub fn step(&self, tab: &TabId, by: i64) {
+        self.send(Command::History(tab.clone(), by));
+    }
+
     /// Loads the tab's page again.
     pub fn reload(&self, tab: &TabId) {
         self.send(Command::Call(tab.clone(), "Page.reload", json!({})));
@@ -234,8 +320,33 @@ impl Engine {
 
     /// Lays the tab's page out for a viewport of `width` × `height` CSS pixels at scale 1; the
     /// frames take that size.
+    ///
+    /// `width` and `height` are the page area's own pixels and the zoom in force divides them: at
+    /// 100% that is the scale-1 case above, and at any other level the page is laid out for
+    /// `width / z` CSS pixels and drawn `z` times as large (see [`Engine::set_zoom`]).
     pub fn set_viewport(&self, tab: &TabId, width: u32, height: u32) {
         self.send(Command::Viewport(tab.clone(), width, height));
+    }
+
+    /// Draws the tab's page at `percent` of its size: the page lays out for a viewport this many
+    /// times smaller and the frame comes back the size the page area is.
+    ///
+    /// A `percent` outside the range the ladder allows is brought inside it, the way a person's own
+    /// zoom control never goes past its ends; the level in force is the one the tab is then drawn
+    /// at, and it is the tab's own until it is changed again.
+    pub fn set_zoom(&self, tab: &TabId, percent: u32) {
+        self.send(Command::Zoom(tab.clone(), percent));
+    }
+
+    /// Keeps every [`Event::Frame`] within `width` × `height` pixels, or with `None` lets it be the
+    /// page area's own size again. The page is laid out as before; only the picture Chromium
+    /// sends is smaller.
+    ///
+    /// A screen that draws a cell as two pixels, one above the other, can show no more than two
+    /// pixels a cell: a frame of the page area's full size is encoded by Chromium, carried, decoded
+    /// and then thrown away all but a sliver of it.
+    pub fn set_picture_limit(&self, limit: Option<(u32, u32)>) {
+        self.send(Command::PictureLimit(limit));
     }
 
     /// Makes `tab` the one whose [`Event::Frame`]s flow; the others' stop.
@@ -260,6 +371,16 @@ impl Engine {
         self.send(Command::Call(tab.clone(), "Input.insertText", json!({ "text": text })));
     }
 
+    /// Answers the page's open dialog: `accept` is OK (or "Leave"), otherwise Cancel (or "Stay");
+    /// `text` is a prompt's answer.
+    pub fn answer_dialog(&self, tab: &TabId, accept: bool, text: Option<&str>) {
+        let mut params = json!({ "accept": accept });
+        if let Some(text) = text {
+            params["promptText"] = json!(text);
+        }
+        self.send(Command::Call(tab.clone(), "Page.handleJavaScriptDialog", params));
+    }
+
     /// Runs `expression` in the tab and waits at most `within` for its value (returnByValue).
     ///
     /// # Errors
@@ -267,13 +388,42 @@ impl Engine {
     /// The exception the expression threw, or why no value came: no such tab, Chromium gone, or
     /// `within` passed.
     pub fn evaluate(&self, tab: &TabId, expression: &str, within: Duration) -> Result<Value, String> {
+        self.client().evaluate(tab, expression, within)
+    }
+
+    /// The tab's page's own text, as [`Reading`], waiting at most `within` for it.
+    ///
+    /// The script runs in a world of the tab's own that the page's scripts cannot see or reach, so
+    /// a page cannot tell that it was read, and it changes nothing while it is read.
+    ///
+    /// # Errors
+    ///
+    /// Why there is no reading: the tab is not there, Chromium is gone, `within` passed, the
+    /// script threw, or the page is not a document at all.
+    pub fn read_page(&self, tab: &TabId, within: Duration) -> Result<Reading, String> {
+        self.client().read_page(tab, within)
+    }
+
+    /// Runs `expression` in the tab's isolated world, where the page's own scripts can neither see
+    /// it nor change what it finds, and waits up to `within` for its value.
+    ///
+    /// # Errors
+    ///
+    /// The exception the expression threw, or why no value came: no such tab, no isolated world
+    /// yet in its document, Chromium gone, or `within` passed.
+    pub fn evaluate_isolated(&self, tab: &TabId, expression: &str, within: Duration) -> Result<Value, String> {
         let (reply, answer) = mpsc::channel();
-        self.send(Command::Evaluate(tab.clone(), expression.to_owned(), reply));
+        self.send(Command::EvaluateIsolated(tab.clone(), expression.to_owned(), reply));
         match answer.recv_timeout(within) {
             Ok(value) => value,
             Err(mpsc::RecvTimeoutError::Timeout) => Err(format!("no value within {} ms", within.as_millis())),
             Err(mpsc::RecvTimeoutError::Disconnected) => Err("Chromium is gone".to_owned()),
         }
+    }
+
+    /// Runs `expression` in the tab and reports its value as [`Event::Answered`], without waiting.
+    pub fn ask(&self, tab: &TabId, expression: &str) {
+        self.send(Command::Ask(tab.clone(), expression.to_owned()));
     }
 
     /// `Browser.close`, a bounded wait, then SIGKILL to Chromium's process group; removes a
@@ -285,10 +435,11 @@ impl Engine {
     fn finish(&mut self) {
         let Some(commands) = self.commands.take() else { return };
         self.closing.store(true, Ordering::SeqCst);
-        let _ = commands.send(Command::Quit);
+        let _ = commands.send(Work::Command(Command::Quit));
         self.chromium.end(true);
-        // With Chromium dead the socket is closed, and without its sender the thread stops at
-        // its next look at the commands in any case.
+        // With Chromium dead its pipe closes and the thread hears so; in case a straggler still
+        // held the pipe, the thread is told itself that the connection is over.
+        let _ = commands.send(Work::Closed("qbrowser closed Chromium".to_owned()));
         drop(commands);
         if let Some(socket) = self.socket.take() {
             let _ = socket.join();
@@ -300,5 +451,53 @@ impl Engine {
 impl Drop for Engine {
     fn drop(&mut self) {
         self.finish();
+    }
+}
+
+/// The engine's own way of being asked something from another thread: the way to the socket
+/// thread and nothing else, so it can be cloned and carried into work that must not hold up
+/// drawing while it waits for an answer.
+#[derive(Debug, Clone)]
+pub struct Client(Option<Sender<Work>>);
+
+impl Client {
+    fn send(&self, command: Command) {
+        if let Some(commands) = &self.0 {
+            let _ = commands.send(Work::Command(command));
+        }
+    }
+
+    /// Runs `expression` in the tab and waits at most `within` for its value (returnByValue).
+    ///
+    /// # Errors
+    ///
+    /// The exception the expression threw, or why no value came: no such tab, Chromium gone, or
+    /// `within` passed.
+    pub fn evaluate(&self, tab: &TabId, expression: &str, within: Duration) -> Result<Value, String> {
+        let (reply, answer) = mpsc::channel();
+        self.send(Command::Evaluate(tab.clone(), expression.to_owned(), reply));
+        wait(&answer, within)
+    }
+
+    /// The tab's page's own text, as [`Reading`], waiting at most `within` for it; see
+    /// [`Engine::read_page`].
+    ///
+    /// # Errors
+    ///
+    /// Why there is no reading: the tab is not there, Chromium is gone, `within` passed, the
+    /// script threw, or the page is not a document at all.
+    pub fn read_page(&self, tab: &TabId, within: Duration) -> Result<Reading, String> {
+        let (reply, answer) = mpsc::channel();
+        self.send(Command::Read(tab.clone(), reply));
+        wait(&answer, within)
+    }
+}
+
+/// The answer of a call the socket thread owed, or why it never came within the time allowed.
+fn wait<T>(answer: &Receiver<Result<T, String>>, within: Duration) -> Result<T, String> {
+    match answer.recv_timeout(within) {
+        Ok(answer) => answer,
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(format!("no value within {} ms", within.as_millis())),
+        Err(mpsc::RecvTimeoutError::Disconnected) => Err("Chromium is gone".to_owned()),
     }
 }

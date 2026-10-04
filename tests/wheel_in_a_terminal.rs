@@ -18,8 +18,11 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-/// The Chromium the tests run, as in the screen tests.
-const CHROMIUM: &str = "/usr/bin/chromium";
+/// The Chromium the tests run, as in the screen tests (see `build.rs`).
+const CHROMIUM: &str = match option_env!("QBROW_TEST_CHROMIUM") {
+    Some(path) => path,
+    None => "/usr/bin/chromium",
+};
 
 /// The longest any step waits: a loaded machine is slow, never stuck.
 const PATIENCE: Duration = Duration::from_secs(30);
@@ -199,6 +202,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 #[test]
+#[cfg_attr(not(chromium), ignore = "needs Chromium")]
 fn the_wheel_a_terminal_reports_scrolls_the_page_on_screen() {
     assert!(Path::new(CHROMIUM).exists(), "the tests need Chromium at {CHROMIUM}");
     let scratch = Scratch::new();

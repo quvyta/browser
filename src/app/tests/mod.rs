@@ -24,8 +24,17 @@ use crate::engine::tests::fixture::{self, CHROMIUM, PATIENCE};
 
 mod bookmarks;
 mod browsing;
+mod copy;
+mod dialogs;
+mod history;
+mod keys;
+mod plain;
+mod reader;
+mod select;
+mod settings;
 mod states;
 mod tabs;
+mod zoom;
 
 pub(super) use fixture::{Slot, page};
 
@@ -69,9 +78,9 @@ impl Scratch {
             path_var: Some(self.path("bin").into_os_string()),
             profile_home: self.path("home"),
             temp_root: self.path("temp"),
+            chromium_arguments: fixture::isolated(),
             config: Some(self.path("config")),
             updates: Some(UpdateFolders { config: self.path("config"), state: self.path("state") }),
-            cell: Some(CELL),
             bookmarks: Some(self.path("data/quvyta/browser/bookmarks")),
         }
     }
